@@ -8,8 +8,8 @@ class Issue_Tracking_System_Report:
         self.description = description
         self.issue_type = issue_type
 
-GITHUB_USER = 'Shusmoy108'
-GITHUB_PASSWORD = ''
+GITHUB_USER = '' # github user name
+GITHUB_PASSWORD = '' # github password
 REPO = 'apache/activemq'  # format is username/repo
 ISSUES_FOR_REPO_URL = 'https://api.github.com/repos/apache/activemq/pulls?state=all&per_page=100'
 AUTH = (GITHUB_USER, GITHUB_PASSWORD)
