@@ -1,0 +1,2725 @@
+Issue key,Issue id,Parent id,Description,Issue Type,Created
+AMQ-7130,13208787,,"Hello,
+
+I was browsing through the documentation. I landed up in the page-> [https://projects.apache.org/project.html?activemq|https://projects.apache.org/project.html?activemq.]
+
+In the Bug-Tracking: [http://issues.apache.org/activemq/browse/AMQ] , URL is wrong, it gives 404 Page Not Found. I think the correct would be [https://issues.apache.org/jira/projects/AMQ] 
+
+I can take up this task, if someone point to the git location or any other pointers would be good.
+
+Thanks!
+
+Regards,
+
+Shubham Gupta
+
+ ",Bug,10/Jan/19 13:42
+AMQ-6062,12916122,,"Hello,
+The Broker may enter a state of high CPU consumption (100% or 200% if 2 browse enter the infinite loop in the same time on a multi-core) when a command line browse on multiple queues is issued. When that arrives the only way we found to restore the situation was to kill the broker and restart because he was not responding anymore to clients. Killing the clients and the browse process does not lower the CPU usage of the broker.
+I assume the infinite loop based on successive thread dumps that show the browse thread remaines in the same code zone:
+
+Here is an example of the Browse thread call stack trace, when Broker is in high CPU usage state:
+{quote}
+at java/util/HashMap.rehash(HashMap.java:782(Compiled Code))
+at java/util/HashMap.rehash(HashMap.java:819(Compiled Code))
+at java/util/HashMap.putImpl(HashMap.java:702(Compiled Code))
+at java/util/HashMap.put(HashMap.java:680(Compiled Code))
+at org/apache/activemq/broker/region/*QueueBrowserSubscription.isDuplicate(QueueBrowserSubscription.java:72*(Compiled Code))
+at org/apache/activemq/broker/region/*Queue.iterate(Queue.java:1688*(Compiled Code))
+at org/apache/activemq/thread/PooledTaskRunner.runTask(PooledTaskRunner.java:133(Compiled Code)).
+{quote}
+
+Tested ActiveMQ versions: 5.9.1 and the last, 5.12.0, but of course I suppose all in beetwen are affected.
+
+The cause seems to be the non-threadsafe usage of the *audit HashMap* member of *QueueBrowserSubscription.java* class.
+Here are some facts on non thread-safe HashMap use problems:
+*High CPU / Hang on java.util.HashMap.findNonNullKeyEntry() due to non-thread-safe usage of HashMap*
+http://www-01.ibm.com/support/docview.wss?uid=swg21597581
+*IZ73767: INFINITE LOOP CAN OCCUR IN HASHMAP*
+http://www-01.ibm.com/support/docview.wss?uid=swg1IZ73767
+
+I must underline that *this is not an IBM JDK specific problem as the IBM JDK is based on Oracle JDK* and changing the JDK or JRE is not a solution.
+
+The scenario may be produced with a fresh non modified install (default config) of ActiveMQ broker:
+1. set ACTIVEMQ_HOME, JAVA_HOME and PATH to point accordingly to the right activemq, and Java version.
+2. cd $ACTIVEMQ_HOME/bin; ./activemq start
+3. inject at least 2000 messages in each of two ques, say QA.ONE and QA.TWO
+4. $ $ACTIVEMQ_HOME/bin/activemq browse --view JMSDestination,JMSMessageID --amqurl tcp://localhost:61616 QA.*
+
+The simplest fix that I suggest is to change in the *QueueBrowserSubscription.java* class the type of *audit* member to *ConcurrentHashMap*.",Bug,25/Nov/15 11:22
+AMQ-5921,12852604,,"The change made in AMQ-1584 changed how primitive classes are handled which is fine, but it got rid of the check for ""void"".
+
+Just need to add a check to the end of the ""loadSimpleType(String name)"" method:
+
+...
+else if (""void"".equals(name)) {
+    return void.class;
+}
+...
+",Bug,06/Aug/15 15:25
+AMQ-5815,12834219,,"When the concurrency is in high level, iops more than 3000/s, we find that most of the amq connections are blocked.We can't either get or push any data through them unless restart.This issue appears *frequency*.
+
+There is many IOExceptions in the amq logs.
+
+{code}
+2015-05-28 00:37:08,544 | ERROR | Checkpoint failed | org.apache.activemq.store.kahadb.MessageDatabase | ActiveMQ Journal Checkpoint Worker
+java.io.IOException: Input/output error
+        at java.io.RandomAccessFile.write(Native Method)[:1.6.0_30]
+        at java.io.RandomAccessFile.writeLong(RandomAccessFile.java:1001)[:1.6.0_30]
+        at org.apache.activemq.util.RecoverableRandomAccessFile.writeLong(RecoverableRandomAccessFile.java:305)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+        at org.apache.activemq.store.kahadb.disk.page.PageFile.writeBatch(PageFile.java:1062)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+        at org.apache.activemq.store.kahadb.disk.page.PageFile.flush(PageFile.java:516)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+        at org.apache.activemq.store.kahadb.MessageDatabase.checkpointUpdate(MessageDatabase.java:1512)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+        at org.apache.activemq.store.kahadb.MessageDatabase$17.execute(MessageDatabase.java:1484)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+        at org.apache.activemq.store.kahadb.disk.page.Transaction.execute(Transaction.java:779)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+        at org.apache.activemq.store.kahadb.MessageDatabase.checkpointUpdate(MessageDatabase.java:1481)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+        at org.apache.activemq.store.kahadb.MessageDatabase.checkpointCleanup(MessageDatabase.java:929)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+        at org.apache.activemq.store.kahadb.MessageDatabase$3.run(MessageDatabase.java:357)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+2015-05-28 00:37:08,547 | INFO  | Ignoring IO exception, java.io.IOException: Input/output error | org.apache.activemq.util.DefaultIOExceptionHandler | ActiveMQ Journal Checkpoint Worker
+java.io.IOException: Input/output error
+        at java.io.RandomAccessFile.write(Native Method)[:1.6.0_30]
+        at java.io.RandomAccessFile.writeLong(RandomAccessFile.java:1001)[:1.6.0_30]
+        at org.apache.activemq.util.RecoverableRandomAccessFile.writeLong(RecoverableRandomAccessFile.java:305)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+        at org.apache.activemq.store.kahadb.disk.page.PageFile.writeBatch(PageFile.java:1062)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+        at org.apache.activemq.store.kahadb.disk.page.PageFile.flush(PageFile.java:516)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+        at org.apache.activemq.store.kahadb.MessageDatabase.checkpointUpdate(MessageDatabase.java:1512)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+        at org.apache.activemq.store.kahadb.MessageDatabase$17.execute(MessageDatabase.java:1484)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+        at org.apache.activemq.store.kahadb.disk.page.Transaction.execute(Transaction.java:779)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+        at org.apache.activemq.store.kahadb.MessageDatabase.checkpointUpdate(MessageDatabase.java:1481)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+        at org.apache.activemq.store.kahadb.MessageDatabase.checkpointCleanup(MessageDatabase.java:929)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+        at org.apache.activemq.store.kahadb.MessageDatabase$3.run(MessageDatabase.java:357)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+2015-05-28 00:37:08,580 | INFO  | KahaDB: Recovering checkpoint thread after death | org.apache.activemq.store.kahadb.MessageDatabase | ActiveMQ Transport: tcp:///10.40.50.31:58171@61616
+2015-05-28 00:37:17,285 | INFO  | Journal failed while writing at: 2359276 | org.apache.activemq.store.kahadb.disk.journal.DataFileAppender | ActiveMQ Data File Writer
+2015-05-28 00:37:17,287 | ERROR | KahaDB failed to store to Journal | org.apache.activemq.store.kahadb.MessageDatabase | ActiveMQ Transport: tcp:///10.40.50.17:4487@61616
+java.io.IOException: Input/output error
+        at sun.nio.ch.FileChannelImpl.force0(Native Method)[:1.6.0_30]
+        at sun.nio.ch.FileChannelImpl.force(FileChannelImpl.java:348)[:1.6.0_30]
+        at org.apache.activemq.util.RecoverableRandomAccessFile.sync(RecoverableRandomAccessFile.java:402)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+        at org.apache.activemq.store.kahadb.disk.journal.DataFileAppender.processQueue(DataFileAppender.java:373)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+        at org.apache.activemq.store.kahadb.disk.journal.DataFileAppender$1.run(DataFileAppender.java:193)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+2015-05-28 00:37:17,291 | ERROR | KahaDB failed to store to Journal | org.apache.activemq.store.kahadb.MessageDatabase | ActiveMQ Transport: tcp:///10.40.50.17:4442@61616
+java.io.IOException: Input/output error
+        at sun.nio.ch.FileChannelImpl.force0(Native Method)[:1.6.0_30]
+        at sun.nio.ch.FileChannelImpl.force(FileChannelImpl.java:348)[:1.6.0_30]
+        at org.apache.activemq.util.RecoverableRandomAccessFile.sync(RecoverableRandomAccessFile.java:402)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+        at org.apache.activemq.store.kahadb.disk.journal.DataFileAppender.processQueue(DataFileAppender.java:373)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+        at org.apache.activemq.store.kahadb.disk.journal.DataFileAppender$1.run(DataFileAppender.java:193)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+2015-05-28 00:37:17,293 | INFO  | Ignoring IO exception, java.io.IOException: Input/output error | org.apache.activemq.util.DefaultIOExceptionHandler | ActiveMQ Transport: tcp:///10.40.50.17:4442@61616
+java.io.IOException: Input/output error
+        at sun.nio.ch.FileChannelImpl.force0(Native Method)[:1.6.0_30]
+        at sun.nio.ch.FileChannelImpl.force(FileChannelImpl.java:348)[:1.6.0_30]
+        at org.apache.activemq.util.RecoverableRandomAccessFile.sync(RecoverableRandomAccessFile.java:402)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+        at org.apache.activemq.store.kahadb.disk.journal.DataFileAppender.processQueue(DataFileAppender.java:373)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+        at org.apache.activemq.store.kahadb.disk.journal.DataFileAppender$1.run(DataFileAppender.java:193)[activemq-kahadb-store-5.10.0.jar:5.10.0]
+{code}
+
+
+With the aid of jstack ,we find dead lock(How can I upload the whole jtack log?)
+The blocked connections are all waiting for 0x00007f90500034e0
+{code}
+[01:08:01] ""ActiveMQ Transport: tcp:///10.40.50.17:4479@61616"" daemon prio=10 tid=0x00007f8f8c015000 nid=0x2ece waiting for monitor entry [0x00007f8f1f6e4000]
+[01:08:01]    java.lang.Thread.State: BLOCKED (on object monitor)
+[01:08:01]         at org.apache.activemq.transaction.LocalTransaction.rollback(LocalTransaction.java:94)
+[01:08:01]         - waiting to lock <0x00007f90500034e0> (a org.apache.activemq.store.kahadb.KahaDBTransactionStore)
+[01:08:01]         at org.apache.activemq.transaction.LocalTransaction.commit(LocalTransaction.java:74)
+[01:08:01]         at org.apache.activemq.broker.TransactionBroker.commitTransaction(TransactionBroker.java:253)
+[01:08:01]         at org.apache.activemq.broker.MutableBrokerFilter.commitTransaction(MutableBrokerFilter.java:112)
+[01:08:01]         at org.apache.activemq.broker.TransportConnection.processCommitTransactionOnePhase(TransportConnection.java:453)
+[01:08:01]         at org.apache.activemq.command.TransactionInfo.visit(TransactionInfo.java:100)
+[01:08:01]         at org.apache.activemq.broker.TransportConnection.service(TransportConnection.java:294)
+[01:08:01]         at org.apache.activemq.broker.TransportConnection$1.onCommand(TransportConnection.java:148)
+[01:08:01]         at org.apache.activemq.transport.MutexTransport.onCommand(MutexTransport.java:50)
+[01:08:01]         at org.apache.activemq.transport.WireFormatNegotiator.onCommand(WireFormatNegotiator.java:113)
+[01:08:01]         at org.apache.activemq.transport.AbstractInactivityMonitor.onCommand(AbstractInactivityMonitor.java:270)
+[01:08:01]         at org.apache.activemq.transport.TransportSupport.doConsume(TransportSupport.java:83)
+[01:08:01]         at org.apache.activemq.transport.tcp.TcpTransport.doRun(TcpTransport.java:214)
+[01:08:01]         at org.apache.activemq.transport.tcp.TcpTransport.run(TcpTransport.java:196)
+[01:08:01]         at java.lang.Thread.run(Thread.java:662)
+{code}
+
+Only one connection(Thread) get this lock.But it is waiting for another Read lock 0x00007f90530ed8d8
+{code}
+[01:08:01] ""ActiveMQ Transport: tcp:///10.40.50.17:4484@61616"" daemon prio=10 tid=0x00007f8fa8039800 nid=0x2ed2 waiting on condition [0x00007f8f1f2e0000]
+[01:08:01]    java.lang.Thread.State: WAITING (parking)
+[01:08:01]         at sun.misc.Unsafe.park(Native Method)
+[01:08:01]         - parking to wait for  <0x00007f90530ed8d8> (a java.util.concurrent.locks.ReentrantReadWriteLock$NonfairSync)
+[01:08:01]         at java.util.concurrent.locks.LockSupport.park(LockSupport.java:156)
+[01:08:01]         at java.util.concurrent.locks.AbstractQueuedSynchronizer.parkAndCheckInterrupt(AbstractQueuedSynchronizer.java:811)
+[01:08:01]         at java.util.concurrent.locks.AbstractQueuedSynchronizer.doAcquireShared(AbstractQueuedSynchronizer.java:941)
+[01:08:01]         at java.util.concurrent.locks.AbstractQueuedSynchronizer.acquireShared(AbstractQueuedSynchronizer.java:1261)
+[01:08:01]         at java.util.concurrent.locks.ReentrantReadWriteLock$ReadLock.lock(ReentrantReadWriteLock.java:594)
+[01:08:01]         at org.apache.activemq.store.kahadb.MessageDatabase.store(MessageDatabase.java:972)
+[01:08:01]         at org.apache.activemq.store.kahadb.MessageDatabase.store(MessageDatabase.java:958)
+[01:08:01]         at org.apache.activemq.store.kahadb.KahaDBTransactionStore.rollback(KahaDBTransactionStore.java:312)
+[01:08:01]         at org.apache.activemq.transaction.LocalTransaction.rollback(LocalTransaction.java:94)
+[01:08:01]         - locked <0x00007f90500034e0> (a org.apache.activemq.store.kahadb.KahaDBTransactionStore)
+[01:08:01]         at org.apache.activemq.transaction.LocalTransaction.commit(LocalTransaction.java:74)
+[01:08:01]         at org.apache.activemq.broker.TransactionBroker.commitTransaction(TransactionBroker.java:253)
+[01:08:01]         at org.apache.activemq.broker.MutableBrokerFilter.commitTransaction(MutableBrokerFilter.java:112)
+[01:08:01]         at org.apache.activemq.broker.TransportConnection.processCommitTransactionOnePhase(TransportConnection.java:453)
+[01:08:01]         at org.apache.activemq.command.TransactionInfo.visit(TransactionInfo.java:100)
+[01:08:01]         at org.apache.activemq.broker.TransportConnection.service(TransportConnection.java:294)
+[01:08:01]         at org.apache.activemq.broker.TransportConnection$1.onCommand(TransportConnection.java:148)
+[01:08:01]         at org.apache.activemq.transport.MutexTransport.onCommand(MutexTransport.java:50)
+[01:08:01]         at org.apache.activemq.transport.WireFormatNegotiator.onCommand(WireFormatNegotiator.java:113)
+[01:08:01]         at org.apache.activemq.transport.AbstractInactivityMonitor.onCommand(AbstractInactivityMonitor.java:270)
+[01:08:01]         at org.apache.activemq.transport.TransportSupport.doConsume(TransportSupport.java:83)
+[01:08:01]         at org.apache.activemq.transport.tcp.TcpTransport.doRun(TcpTransport.java:214)
+[01:08:01]         at org.apache.activemq.transport.tcp.TcpTransport.run(TcpTransport.java:196)
+[01:08:01]         at java.lang.Thread.run(Thread.java:662)
+{code}
+
+At last we find 0x00007f90530ed8d8 is in many write lock waiting.But none write lock hodes it. The dead lock occurs.
+{code}
+[01:07:56] ""ActiveMQ Transport: tcp:///10.40.50.47:60701@61616"" daemon prio=10 tid=0x00007f8f7cbc5000 nid=0x3ec8 waiting on condition [0x00007f900d864000]
+[01:07:56]    java.lang.Thread.State: WAITING (parking)
+[01:07:56]         at sun.misc.Unsafe.park(Native Method)
+[01:07:56]         - parking to wait for  <0x00007f90530ed8d8> (a java.util.concurrent.locks.ReentrantReadWriteLock$NonfairSync)
+[01:07:56]         at java.util.concurrent.locks.LockSupport.park(LockSupport.java:156)
+[01:07:56]         at java.util.concurrent.locks.AbstractQueuedSynchronizer.parkAndCheckInterrupt(AbstractQueuedSynchronizer.java:811)
+[01:07:56]         at java.util.concurrent.locks.AbstractQueuedSynchronizer.doAcquireShared(AbstractQueuedSynchronizer.java:941)
+[01:07:56]         at java.util.concurrent.locks.AbstractQueuedSynchronizer.acquireShared(AbstractQueuedSynchronizer.java:1261)
+[01:07:56]         at java.util.concurrent.locks.ReentrantReadWriteLock$ReadLock.lock(ReentrantReadWriteLock.java:594)
+[01:07:56]         at org.apache.activemq.store.kahadb.MessageDatabase.store(MessageDatabase.java:972)
+[01:07:56]         at org.apache.activemq.store.kahadb.MessageDatabase.store(MessageDatabase.java:958)
+[01:07:56]         at org.apache.activemq.store.kahadb.KahaDBStore$KahaDBMessageStore.removeMessage(KahaDBStore.java:453)
+[01:07:56]         at org.apache.activemq.store.kahadb.KahaDBStore$KahaDBMessageStore.removeAsyncMessage(KahaDBStore.java:407)
+[01:07:56]         at org.apache.activemq.store.kahadb.KahaDBTransactionStore.removeAsyncMessage(KahaDBTransactionStore.java:498)
+[01:07:56]         at org.apache.activemq.store.kahadb.KahaDBTransactionStore$1.removeAsyncMessage(KahaDBTransactionStore.java:185)
+[01:07:56]         at org.apache.activemq.broker.region.Queue.acknowledge(Queue.java:998)
+[01:07:56]         at org.apache.activemq.broker.region.Queue.removeMessage(Queue.java:1781)
+[01:07:56]         at org.apache.activemq.broker.region.QueueSubscription.acknowledge(QueueSubscription.java:63)
+[01:07:56]         at org.apache.activemq.broker.region.PrefetchSubscription.acknowledge(PrefetchSubscription.java:235)
+[01:07:56]         - locked <0x00007f905d10b1e8> (a java.lang.Object)
+[01:07:56]         at org.apache.activemq.broker.region.AbstractRegion.acknowledge(AbstractRegion.java:446)
+[01:07:56]         at org.apache.activemq.broker.region.RegionBroker.acknowledge(RegionBroker.java:461)
+[01:07:56]         at org.apache.activemq.broker.BrokerFilter.acknowledge(BrokerFilter.java:82)
+[01:07:56]         at org.apache.activemq.broker.TransactionBroker.acknowledge(TransactionBroker.java:277)
+[01:07:56]         at org.apache.activemq.broker.MutableBrokerFilter.acknowledge(MutableBrokerFilter.java:92)
+[01:07:56]         at org.apache.activemq.broker.TransportConnection.processMessageAck(TransportConnection.java:505)
+[01:07:56]         at org.apache.activemq.command.MessageAck.visit(MessageAck.java:245)
+[01:07:56]         at org.apache.activemq.broker.TransportConnection.service(TransportConnection.java:294)
+[01:07:56]         at org.apache.activemq.broker.TransportConnection$1.onCommand(TransportConnection.java:148)
+[01:07:56]         at org.apache.activemq.transport.MutexTransport.onCommand(MutexTransport.java:50)
+[01:07:56]         at org.apache.activemq.transport.WireFormatNegotiator.onCommand(WireFormatNegotiator.java:113)
+[01:07:56]         at org.apache.activemq.transport.AbstractInactivityMonitor.onCommand(AbstractInactivityMonitor.java:270)
+[01:07:56]         at org.apache.activemq.transport.TransportSupport.doConsume(TransportSupport.java:83)
+[01:07:56]         at org.apache.activemq.transport.tcp.TcpTransport.doRun(TcpTransport.java:214)
+[01:07:56]         at org.apache.activemq.transport.tcp.TcpTransport.run(TcpTransport.java:196)
+[01:07:56]         at java.lang.Thread.run(Thread.java:662)
+{code}
+
+In my opinion, IOExceptions may lead to losing persisten messages and so on ,but the broker shouldn't stop service.",Bug,01/Jun/15 12:21
+AMQ-5714,12819319,,"The pathCanonical method does not work as expected for directories that contain either single characters or 2 characters.  This is caused by the following entry -
+
+{noformat}
+echo ""${dst}"" | sed -e 's#//#/#g' -e 's#/./#/#g' -e 's#/[^/]*/../#/#g'
+{noformat}
+
+This can be resolved with the following changes -
+
+{noformat}
+echo ""${dst}"" | sed -e 's#//#/#g' -e 's#/\./#/#g' -e 's#/[^/]*/\.\./#/#g'
+{noformat}
+
+Example, before and after -
+
+{noformat}
+# echo /1/2/3/4/11/22/33/44/.././x | sed -e 's#//#/#g' -e 's#/./#/#g' -e 's#/[^/]*/../#/#g'
+/2/22/../x
+
+# echo /1/2/3/4/11/22/33/44/.././x | sed -e 's#//#/#g' -e 's#/\./#/#g' -e 's#/[^/]*/\.\./#/#g'
+/1/2/3/4/11/22/33/x
+{noformat}",Bug,08/Apr/15 13:46
+AMQ-5685,12785122,,"When clicking purge from the web console the page refreshes without purging the queue.  It appears that the Destinations are checked to be an instanceof Queue before trying the purge call, however the authorisation plugin wraps destinations with destinationfilters and so no purge can happen.",Bug,24/Mar/15 10:14
+AMQ-5579,12774296,,"Attempting to post a message to AMQ using the following yields an IllegalStateException:
+
+*Example Command*
+{code}
+curl -u admin:admin -d ""hello world"" -XPOST http://localhost:8161/api/message?destination=queue://abc.def
+{code}
+
+*Exception*
+{code}
+java.lang.IllegalStateException: STREAMED
+	at org.eclipse.jetty.server.Request.getReader(Request.java:898)
+	at org.apache.activemq.web.MessageServletSupport.getPostedMessageBody(MessageServletSupport.java:347)
+	at org.apache.activemq.web.MessageServlet.doPost(MessageServlet.java:126)
+	at javax.servlet.http.HttpServlet.service(HttpServlet.java:595)
+	at javax.servlet.http.HttpServlet.service(HttpServlet.java:668)
+	at org.eclipse.jetty.servlet.ServletHolder.handle(ServletHolder.java:684)
+	at org.eclipse.jetty.servlet.ServletHandler.doHandle(ServletHandler.java:503)
+	at org.eclipse.jetty.server.handler.ScopedHandler.handle(ScopedHandler.java:137)
+	at org.eclipse.jetty.security.SecurityHandler.handle(SecurityHandler.java:522)
+	at org.eclipse.jetty.server.session.SessionHandler.doHandle(SessionHandler.java:231)
+	at org.eclipse.jetty.server.handler.ContextHandler.doHandle(ContextHandler.java:1086)
+	at org.eclipse.jetty.servlet.ServletHandler.doScope(ServletHandler.java:429)
+	at org.eclipse.jetty.server.session.SessionHandler.doScope(SessionHandler.java:193)
+	at org.eclipse.jetty.server.handler.ContextHandler.doScope(ContextHandler.java:1020)
+	at org.eclipse.jetty.server.handler.ScopedHandler.handle(ScopedHandler.java:135)
+	at org.eclipse.jetty.server.handler.HandlerCollection.handle(HandlerCollection.java:154)
+	at org.eclipse.jetty.security.SecurityHandler.handle(SecurityHandler.java:522)
+	at org.eclipse.jetty.server.handler.HandlerCollection.handle(HandlerCollection.java:154)
+	at org.eclipse.jetty.server.handler.HandlerWrapper.handle(HandlerWrapper.java:116)
+	at org.eclipse.jetty.server.Server.handle(Server.java:370)
+	at org.eclipse.jetty.server.AbstractHttpConnection.handleRequest(AbstractHttpConnection.java:494)
+	at org.eclipse.jetty.server.AbstractHttpConnection.content(AbstractHttpConnection.java:982)
+	at org.eclipse.jetty.server.AbstractHttpConnection$RequestHandler.content(AbstractHttpConnection.java:1043)
+	at org.eclipse.jetty.http.HttpParser.parseNext(HttpParser.java:865)
+	at org.eclipse.jetty.http.HttpParser.parseAvailable(HttpParser.java:240)
+	at org.eclipse.jetty.server.AsyncHttpConnection.handle(AsyncHttpConnection.java:82)
+	at org.eclipse.jetty.io.nio.SelectChannelEndPoint.handle(SelectChannelEndPoint.java:696)
+	at org.eclipse.jetty.io.nio.SelectChannelEndPoint$1.run(SelectChannelEndPoint.java:53)
+	at org.eclipse.jetty.util.thread.QueuedThreadPool.runJob(QueuedThreadPool.java:608)
+	at org.eclipse.jetty.util.thread.QueuedThreadPool$3.run(QueuedThreadPool.java:543)
+	at java.lang.Thread.run(Thread.java:745)
+{code}
+
+Note that changing the {{-d}} syntax to {{-d ""body=hello world""}}, the problem goes away.",Bug,11/Feb/15 18:06
+AMQ-5447,12756913,,"After shutdown embeded activemq broker with JDBC store, 2 'ActiveMQ JDBC PA Scheduled Task' is still alive.
+Because the 2 thread's Thread factory is object of JDBCPersistenceAdapter's inner class, so the object of JDBCPersistenceAdapter can be reached from the 2 threads, JDBCPersistenceAdapter has a field point to BrokerService. So the instance of BrokerService can be reached from the 2 threads.
+
+So the stopped brokerService cannot be GC.
+
+The root cause is that when stopping JDBCPersistenceAdapter, only cancelling cleanupTicket without shutdown clockDaemon, that's why the 2 threads are still alive.
+
+According to http://activemq.apache.org/how-do-i-restart-embedded-broker.html, it's better (more reliable) to instantiate the broker again instead of reuse old broker. So if I restart embeded broker, there will be  1 more BrokerService in memory. I think it's memory leak.",Bug,21/Nov/14 07:32
+AMQ-5441,12755853,,"In the PersistenceAdapter for the broker, you'll see the call getDestinations() which is used (At least in MQTT) on each connect to see if the connecting client has any subscriptions.   The issue is that getDesitinations() returns all durable subscriptions.  We have an environment which has status / state which are retained, as well, each client supports 10 durable subscriptions.  With 10 K client connections this implies a dip into the DB which will return 80 bytes for each DESTINATION in the data base * 10K or 8 Meg on each connect.   This needs to be filtered in the DB query since you are not looking for other clientids.  All PersistenceAdaptors implemented have this issue. 
+
+I have modified the all the DB adaptors to support a new method called getDestinations(String client_id).  I have also modified the JDBC query to support a query which is specific to a given client-id and does not need to loop through all (thousands of ) connections filtering the client_id in the code.. 
+(see PersistenceAdapterSupport.listSubscriptions()).. 
+ 
+I've also attached a JUnit test which demos the issue using derbyDb.. 
+",Bug,17/Nov/14 17:40
+AMQ-5387,12747412,,"{noformat}
+**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the ""License""); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an ""AS IS"" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.activemq.transport.mqtt;
+
+import static org.junit.Assert.*;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.apache.commons.net.util.Base64;
+import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
+import org.eclipse.paho.client.mqttv3.MqttCallback;
+import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
+import org.eclipse.paho.client.mqttv3.MqttException;
+import org.eclipse.paho.client.mqttv3.MqttMessage;
+import org.eclipse.paho.client.mqttv3.MqttPersistenceException;
+import org.eclipse.paho.client.mqttv3.MqttSecurityException;
+import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
+import org.junit.Test;
+
+
+
+/**
+ * Test the NIO transport with this Test group
+ */
+public class PahoMQTTNIOTest extends PahoMQTTTest  implements MqttCallback {
+
+    AtomicInteger m_receiveCounter = new AtomicInteger();
+    String BigMessage = ""................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................;........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................"";;
+    static ArrayList<MqttClient> mqttClients = null;
+    static final Integer staticSyncObj = new Integer(1); 
+    String messagePayload = null;
+    
+    public final int numberOfThreads = 500;
+    static ArrayList<pubThreadBitMsg> arrThreads = new ArrayList<pubThreadBitMsg>();
+    
+    boolean f_messageReceived = false;
+    boolean f_ackReceived = false;
+    boolean f_lost = false;
+
+    /**
+     * 
+     * 
+     * @param client
+     * @param location
+     * @param accountId
+     * @param userId
+     * @param clientId
+     * @param token
+     * @param nameSpace
+     * @param message
+     * @param qos
+     * @param f_retained
+     * @param f_keepOpen
+     * @return
+     * @throws MqttException
+     */
+    private MqttClient pubNameSpace(MqttClient client,  
+                                    String    location, 
+                                    String    accountId, 
+                                    String    userId, 
+                                    String    clientId,
+                                    String    token, 
+                                    String    nameSpace, 
+                                    String    message, 
+                                    int       qos, 
+                                    boolean   f_retained,  
+                                    boolean   f_keepOpen) throws MqttException
+    {
+
+        try
+        {        
+            boolean f_wasConnected = true; 
+            
+            if (client == null)
+            {
+                f_wasConnected = false; 
+                client = new MqttClient(location, clientId/*, persistence*/);
+            }
+            
+            if (!f_wasConnected)
+            {
+                MqttConnectOptions options = new MqttConnectOptions();
+                options.setKeepAliveInterval(60);
+                options.setConnectionTimeout(120);
+                options.setPassword(token.toCharArray());
+                options.setUserName(accountId+"":""+userId);
+                client.connect(options);
+                client.setCallback(this);
+            }
+    
+            MqttMessage mqttMessage = new MqttMessage();
+            mqttMessage.setPayload(message.getBytes());
+            mqttMessage.setQos(qos);
+            mqttMessage.setRetained(f_retained);
+    
+            
+            client.publish(nameSpace, mqttMessage);
+            
+            if (!f_keepOpen)
+            {
+                client.disconnect();
+                client.close();
+                client = null; 
+            }
+            return client; 
+        }
+        catch (MqttPersistenceException e)
+        {
+            System.err.println(""pubNameSpace : YOU CAN'T USE THE SAME CLIENTID MULTIPLE TIMES IN A PERSISTENT WAY Excpetion  - ""+e.getMessage());
+            if (client != null)
+            {
+                client.disconnect(); 
+                client.close();
+                client = null;
+            }
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+            System.err.println(""Exception e = ""+e.getMessage());
+            if (client != null)
+            {
+                client.disconnect(); 
+                client.close();
+                client = null;
+            }
+        }
+        return null;
+    }
+    /**
+     * 
+     * @param location
+     * @param accountId
+     * @param userId
+     * @param clientId
+     * @param token
+     * @param nameSpace
+     * @param message
+     * @param qos
+     * @param f_retained
+     * @param f_keepOpen
+     * @return
+     * @throws MqttException
+     */
+    private MqttClient pubNameSpace(String    location, 
+                                    String    accountId, 
+                                    String    userId, 
+                                    String    clientId,
+                                    String    token, 
+                                    String    nameSpace, 
+                                    String    message, 
+                                    int       qos, 
+                                    boolean   f_retained,  
+                                    boolean   f_keepOpen) throws MqttException
+    {
+
+        try
+        {        
+            MqttClient client = new MqttClient(location, clientId/*, persistence*/);
+            client.setCallback(this);
+            MqttConnectOptions options = new MqttConnectOptions();
+            options.setKeepAliveInterval(60);
+            options.setConnectionTimeout(120);
+            options.setPassword(token.toCharArray());
+            options.setUserName(accountId+"":""+userId);
+    
+            MqttMessage mqttMessage = new MqttMessage();
+            mqttMessage.setPayload(message.getBytes());
+            mqttMessage.setQos(qos);
+            mqttMessage.setRetained(f_retained);
+    
+            client.connect(options);
+            client.publish(nameSpace, mqttMessage);
+            
+            if (!f_keepOpen)
+            {
+                client.disconnect();
+                client.close();
+            }
+            return client; 
+        }
+        catch (MqttPersistenceException e)
+        {
+            System.err.println(""YOU CAN'T USE THE SAME CLIENTID MULTIPLE TIMES IN A PERSISTENT WAY : ""+e.getMessage());
+            assertTrue(false);
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+            System.err.println(""Exceptoin e = ""+e.getMessage()); 
+            assertTrue(false);
+        }
+        return null;
+    }
+   
+    
+    /**
+     * 
+     * @param input
+     * @param output
+     * @return
+     * @throws IOException
+     */
+    public static long copyLarge(InputStream input, OutputStream output) throws IOException 
+    {
+      byte[] buffer = new byte[4096];
+      long count = 0L;
+      int n = 0;
+      while (-1 != (n = input.read(buffer))) {
+       output.write(buffer, 0, n);
+       count += n;
+      }
+      return count;
+    }
+    
+    /**
+     * 
+     * @param p
+     * @throws IOException
+     */
+    public static void outputResults (Process p) throws IOException
+    {
+        BufferedReader stdInput = new BufferedReader(new
+                                         InputStreamReader(p.getInputStream()));
+
+        BufferedReader stdError = new BufferedReader(new
+                        InputStreamReader(p.getErrorStream()));
+
+        String s; 
+        while ((s = stdInput.readLine()) != null) 
+        {
+            System.out.println(s);
+        }
+        while ((s = stdError.readLine()) != null) 
+        {
+            System.out.println(s);
+        }
+    }
+    
+    /**
+     * HELPER
+     * @param msec
+     * @throws InterruptedException
+     */
+    void pause_til_done_or_time(int msec) throws InterruptedException
+    {
+        int pauseTime = 100; 
+        while (!f_messageReceived && msec > 0 && !f_lost)
+        {
+            Thread.sleep(pauseTime);
+            msec -= pauseTime;
+        }
+        
+    }
+
+    static Integer numberOfMessages = 0; 
+    public void clearMessageCount()
+    {
+        numberOfMessages = 0; 
+    }
+    public Integer getMessageCount()
+    {
+        return numberOfMessages; 
+    }
+    /**
+     * 
+     * @param msec
+     */
+    private void waitForItAck(int msec)
+    {
+        while (!f_ackReceived)
+        {
+            
+            try { Thread.sleep(1000); } catch (Exception e){}
+            
+            msec= msec-1000;
+                            
+            if (msec < 0)
+            {
+                break;
+            }
+        }
+    }
+    
+    @Override
+    public String getProtocolScheme() {
+        return ""mqtt+nio"";
+    }
+
+    @Override
+    public boolean isUseSSL() {
+        return false;
+    }
+
+    public class PahoCallback implements MqttCallback {
+
+        @Override
+        public void connectionLost(Throwable cause) {
+            // TODO Auto-generated method stub
+            
+        }
+
+        @Override
+        public void messageArrived(String topic, MqttMessage message)
+                throws Exception {
+            m_receiveCounter.incrementAndGet();
+        }
+
+        @Override
+        public void deliveryComplete(IMqttDeliveryToken token) {
+            // TODO Auto-generated method stub
+            
+        }
+        
+    }
+ 
+    static   MqttClient BalstTestClient = null;
+    String   loc = ""tcp://localhost:1883"";
+
+    public class pubThreadBitMsg extends Thread {
+        
+        public pubThreadBitMsg()
+        {
+            synchronized (staticSyncObj)
+            {
+                try
+                {
+                    System.out.println(""---- pubTheadBitMsg - constructor""); 
+                    if (BalstTestClient == null)
+                    {
+                        BalstTestClient = pubNameSpace(loc, ""cjutzi"", 
+                                        ""someone"", 
+                                         ""myclientid_cjutzi_pub"", 
+                                         ""hello"",
+                                         ""/accounts/cjutzi/users/curt/test"", 
+                                         ""Starting Client"", 1, false, true);
+                        System.out.println(""---- pubTheadBitMsg - init""); 
+                    }
+                } 
+                catch (MqttException e)
+                {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        public void run()
+        {
+//            synchronized (staticSyncObj) 
+            {
+            try
+            {
+                System.out.println(""---- pubTheadBitMsg - send""); 
+                pubNameSpace(BalstTestClient, loc, ""cjutzi"", 
+                              ""someone"", 
+                               ""myclientid_cjutzi_pub"", 
+                               ""hello"",
+                               ""/accounts/cjutzi/users/curt/test"", 
+                               BigMessage, 1, false, true);
+                } catch (MqttException e)
+                {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+    
+    @Test
+    public void test_AckOnOldListenerQos1Blast100B10KBlocks() throws MqttException, InterruptedException
+    {
+        MqttClient subClient = new MqttClient(""tcp://localhost:1883"",
+                ""niosubclient"",
+                new MemoryPersistence());
+        MqttConnectOptions cOpts = new MqttConnectOptions();
+        cOpts.setCleanSession(true);
+        cOpts.setUserName(""curt"");
+        cOpts.setPassword(""hello"".toCharArray());
+        
+       
+        subClient.setCallback(new PahoCallback());
+        subClient.connect(cOpts);
+        subClient.subscribe(""nio/test"");
+       
+        
+        for (int i = 0; i < numberOfThreads; i++) 
+        {
+            arrThreads.add(new pubThreadBitMsg());
+        }
+        System.out.println(""--started""); 
+        for (int i = 0; i < numberOfThreads; i++) 
+        {
+            arrThreads.get(i).start(); 
+        }
+        System.out.println(""-- waiting""); 
+        Thread.sleep(10000);
+        assertTrue(numberOfThreads == m_receiveCounter.get());
+    }
+    
+    
+    /**
+     * 
+     */
+    private void resetFlag()
+    {
+        f_messageReceived = false; 
+        f_ackReceived = false; 
+    }
+    /***************************************************************/
+    /**              CALL BACKS FOR MQTT                           */
+    /***************************************************************/
+   
+    
+
+    
+    /**
+     * 
+     */
+      public void connectionLost(Throwable arg0)
+      {
+          System.out.println(""MQTT - Connection Lost"");
+//          f_terminate = true;
+          f_lost = true;
+      }
+
+      /**
+       * 
+       */
+      public void deliveryComplete(IMqttDeliveryToken arg0)
+      {
+          System.out.println(""MQTT - delivery complete: Delivery Tokeh = ""+arg0.isComplete());
+          f_ackReceived = true;
+      }
+      
+      /**
+       * 
+       */
+      public void messageArrived(String arg0, MqttMessage arg1) throws Exception
+      {
+          synchronized (numberOfMessages)
+          {
+              numberOfMessages++;   
+              System.out.println(""MQTT - messageArrived ""+arg0+""\nMessage: \t[""+arg1+""] QoS: [""+arg1.getQos()+""] isDup [""+arg1.isDuplicate()+""] nameSpace = "");
+//            System.out.print(arg1.isDuplicate()?""*"":""."");
+              byte[] payloadBytes = arg1.getPayload(); 
+              if (payloadBytes.length >0 )
+              {
+                  messagePayload = new String(payloadBytes); 
+              }
+              System.out.println(""Message Recieved...""); 
+              f_messageReceived = true;
+          } 
+      }
+      
+}
+
+
+{noformat}",Bug,10/Oct/14 21:13
+AMQ-5295,12730591,,"HttpsClientTransport is getting wrong SSLSocketFactory.
+
+The problem is here:
+{code}
+    private SchemeRegistry createSchemeRegistry() {
+
+        SchemeRegistry schemeRegistry = new SchemeRegistry();
+        try {
+            // register the default socket factory so that it looks at the javax.net.ssl.keyStore,
+            // javax.net.ssl.trustStore, etc, properties by default
+            SSLSocketFactory sslSocketFactory =
+                    new SSLSocketFactory((javax.net.ssl.SSLSocketFactory) javax.net.ssl.SSLSocketFactory.getDefault(),
+                    SSLSocketFactory.BROWSER_COMPATIBLE_HOSTNAME_VERIFIER);
+            schemeRegistry.register(new Scheme(""https"", getRemoteUrl().getPort(), sslSocketFactory));
+            return schemeRegistry;
+        } catch (Exception e) {
+            throw new IllegalStateException(""Failure trying to create scheme registry"", e);
+        }
+    }
+{code}
+
+The problem with that code is, that it never take SSLSocketFactory from spring context. So the one defined in XML is ignored.
+
+So it's code have to be replaced with:
+
+{code}
+    private SchemeRegistry createSchemeRegistry() {
+
+        SchemeRegistry schemeRegistry = new SchemeRegistry();
+        try {
+            // register the default socket factory so that it looks at the javax.net.ssl.keyStore,
+            // javax.net.ssl.trustStore, etc, properties by default
+            SSLSocketFactory sslSocketFactory = createSocketFactory();
+            schemeRegistry.register(new Scheme(""https"", getRemoteUrl().getPort(), sslSocketFactory));
+            return schemeRegistry;
+        } catch (Exception e) {
+            throw new IllegalStateException(""Failure trying to create scheme registry"", e);
+        }
+    }
+{code}
+
+And then new method should be added:
+
+{code}
+    /**
+     * Creates a new SSL SocketFactory. The given factory will use user-provided
+     * key and trust managers (if the user provided them).
+     *
+     * @return Newly created (Ssl)SocketFactory.
+     * @throws IOException
+     */
+    protected SocketFactory createSocketFactory() throws IOException {
+        if (SslContext.getCurrentSslContext() != null) {
+            SslContext ctx = SslContext.getCurrentSslContext();
+            try {
+                return ctx.getSSLContext().getSocketFactory();
+            } catch (Exception e) {
+                throw IOExceptionSupport.create(e);
+            }
+        } else {
+            return SSLSocketFactory.getDefault();
+        }
+
+    }
+{code}
+
+This is consistent solution with other transports.
+
+I will prepare patches and tests for this scenerio.
+
+Greetings
+Piotr Klimczak",Bug,29/Jul/14 20:04
+AMQ-4887,12679335,,"ActiveMQBytesMessage will lost content if message's property was set before copy. Here is the test code:
+
+Producer:
+MessageProducer producer;  
+//initialize Connection, Session, MessageProducer    
+byte[] bs = ""bytes message"".getBytes();  
+BytesMessage message = session.createBytesMessage();  
+message.writeBytes(bs);  //write bytes to message 1
+  
+for(int i=0; i< 0; i++){  
+  // then set message's propery   2
+    message.setLongProperty(""sendTime"", System.currentTimeMillis());  
+    try{  
+        producer.send(message);  
+    }catch(){  
+         e.printStackTrace();  
+    }
+}  
+
+Consumer:
+
+MessageConsumer consumer  
+//initailize Connection, Session, MessageConsumer  
+for(int i=0; i<10; i++){  
+    ActiveMQBytesMessage msg = (ActiveMQBytesMessage)consumer.receive(60*1000);  
+    long sendTime = message.getLongProperty(""sendTime"");  
+    System.out.println(""sendtime:"" + sendTime);  
+    ByteSequence bs = message.getMessage().getContent();  
+    System.out.println(""bytes data:"" + new String(bs.getData()));  
+}  
+
+Expected result:
+consumer gets bytes data in all received messages
+
+Actual result:
+only the fisrt message has bytes data, all other messages lost bytes data, while long property value is not lost;
+
+Analysization:
+message gets copied when send, it will call storeContent() before copy,  DataOutputStream dataOut will be closed and the data in dataOut will be set to conent. This works correctly if there are no property was set.
+
+when setLongProperty was called, it will call setObjectProperty() then will call  initializeWriting(), here DataOutputStream dataOut  will be create AGAIN. 
+
+So when message was copied in second time, DataOutputStream dataOut is NOT null, but EMPTY, it will clear the value in content.
+
+suggestion:
+restore the content data to DataOutputStream dataOut when nitializeWriting()
+
+my fix:
+ActiveMQBytesMessage :
+ private void  initializeWriting() throws JMSException {
+669        The original code
+                ......
+701        
+            //fix code
+            if(this.content !=null && this.content.length >0){
+                try{
+                    this.dataOut.write(this.content.getData());
+                }catch(IOException ioe){
+                    throw JMSExceptionSupport.create(ioe);
+                }
+            }
+702    }",Bug,15/Nov/13 04:02
+AMQ-4746,12670976,,"Applets fail to deserailize messages in a timely manner after a network failure triggers a reconnect using the FailoverTransport
+
+In ClassLoadingAwareObjectInputStream.java the  load() method makes a call to Class.forName().
+
+For the primitive types (int, boolean, etc.) this would result in a call similar to:
+    Class.forName(""int"", false, loader); //Where loader is the Applet2ClassLoader
+
+Since Applet2ClassLoader is a URLClassLoader and ""int.class"" is not in the jar cache it pulled down from the server at the start of application, it is going to try and go to the server to resolve this class.
+In the event of a network failure, this will result in the ClassLoader having to wait for the socket timeout. (see stacktrace at link) Once this socket timeout occurs, the load() method then attempts to lookup the class in the primitive HashMap that is statically initialized. This returns the class for the int and the deserialization continues on.
+
+At first it seemed like the messages were failing to be received but it turned out they were just taking a very long time to be deserialized. This problem can be avoided by changing the order in which ClassLoadingAwareObjectInputStream tries to resolve the class. 
+
+Here is the change I made to the load() method: http://activemq.2283324.n4.nabble.com/Applet-Class-Loader-Problems-td4671835.html 
+
+",Bug,27/Sep/13 17:21
+AMQ-4591,12653876,,"There is a Bug on handle the once per minute case.
+For the cronentry: ""* * * * *"" 
+The Next Scheduled time is not the top of the next minute.
+Instead, is the current Time plus 60 seconds
+
+The problem is that the code is trying to set the precision at seconds, but the precision must have to be at minutes. 
+
+You can check the patch attached to see the change required to fix this issue.",Bug,20/Jun/13 07:08
+AMQ-4140,12613792,,"Hi,
+
+I am using ActiveMQ and have some integration tests leveraging the maven-activemq-plugin.
+
+I have found that:
+
+1. path to XBean files are not resolved properly, as:
+- the path is relative, and therefore, multi-module builds fail;
+- at least under Windows, the generated path is not a valid URL, hence the plugin fails on this call: final BrokerService broker = BrokerFactory.createBroker(configUri);
+
+2. unlike other Maven plugins, maven-activemq-plugin doesn't follow the convention of having a skip flag, to skip execution under some circumstances. This is not a bug, but rather an improvement that would make users' life easier IMO (and at least, mine).
+
+In the attachments, I have provided:
+- a multi-module build that would allow you to easily and systematically replicate the above two issues: maven-activemq-plugin-user-acceptance-test.zip
+- a ""fixed"" version of maven-activemq-plugin, based on trunk / 5.8-SNAPSHOT (as of 2012/10/28 06:34 BST): maven-activemq-plugin.zip
+- a patch, containing the equivalent fix, in case this format is preferred: maven-activemq-plugin.patch
+
+I hope this will help to have this resolved in a 5.7.1 or 5.8 version of the plugin very soon? :-)
+
+Cheers,
+
+M.
+
+P.S. : In case you need committers, I would be happy to occasionally help.
+(I noticed the documentation for this plugin is rather outdated, so could help with that at least)",Bug,28/Oct/12 06:41
+AMQ-3927,12598921,,"Using telnet I can't connect to stomp protocol 1.1. netcat works fine
+
+
+holla@knopfler[507]: telnet eric 61613
+Connected to eric.
+Escape character is '^]'.
+CONNECT
+accept-version:1.1
+heart-beat:0,0
+
+^@   
+ERROR
+content-type:text/plain
+], supported versions are: [1.1, 1.0]
+
+], supported versions are: [1.1, 1.0]rotocolException: Invalid Protocol version[1.1
+        at org.apache.activemq.transport.stomp.ProtocolConverter.onStompConnect(ProtocolConverter.java:586)
+        at org.apache.activemq.transport.stomp.ProtocolConverter.onStompCommand(ProtocolConverter.java:181)
+        at org.apache.activemq.transport.stomp.StompTransportFilter.onCommand(StompTransportFilter.java:76)
+        at org.apache.activemq.transport.TransportSupport.doConsume(TransportSupport.java:83)
+        at org.apache.activemq.transport.tcp.TcpTransport.doRun(TcpTransport.java:222)
+        at org.apache.activemq.transport.tcp.TcpTransport.run(TcpTransport.java:204)
+        at java.lang.Thread.run(Thread.java:619)
+
+Connection closed by foreign host.
+
+holla@knopfler[508]: nc eric 61613
+Trying 75.101.139.42...
+^C
+holla@knopfler[509]: nc eric 61613
+CONNECT
+accept-version:1.1
+heart-beat:0,0
+
+^@
+CONNECTED
+heart-beat:0,0
+session:ID:eric-51104-1342368411805-2:16
+server:ActiveMQ/5.7-SNAPSHOT
+version:1.1
+
+
+I suspect the telnet induced CR or LF isn't stripped correctly. You can see this because the error message formatting is screwed up.
+",Bug,16/Jul/12 06:36
+AMQ-3857,12556942,,"When using GET to get a message it does not return any of the JMS message properties.
+
+I can easily see how to add that code, but I'm not sure what the correct way to return them is.  They could go into the response headers via setResponseHeaders or the returned XML format could be changed to support properties and the header.  Sadly this would likely break most existing clients.  
+
+We'd like to use the REST API to enable some web clients to fully participate in a messaging system that is primarily Java based.  
+
+If we can come to agreement on how we want to return properties then I'd be happy to code up a patch.  ",Bug,23/May/12 00:22
+AMQ-3845,12556038,,"If the ldap connection dies for some reason (ldap server restarting etc.), the broker will continue to attempt to use the old connection for authorization, resulting in all attempts to use the broker being denied.
+
+In CachedLDAPAuthorizationMap.java, the open() function just returns the context if one exists. Instead, it should check to see if the context is still valid, and if not create one.
+
+Alternatively, the caching of the ldap connection can be removed entirely, and then in the refreshInterval>0 case, a new ldap connection will be made each refresh interval (default setting: every 5 minutes).
+i.e. delete these lines:
+        if (context != null) {
+            return context;
+        }",Bug,16/May/12 14:05
+AMQ-3828,12553914,,"URISupport.parseComposite(URI) incorrectly parses an URI with a closing parenthesis "")"" in the query part.
+
+{code}
+// The URI is parsed incorrectly when there is an unescaped ')'
+URI uri = new URI(""failover://()?updateURIsURL=file:/C:/Dir(1)/a.csv"");
+CompositeData data = URISupport.parseComposite(uri);
+
+// Parsed Composite Data:
+// - Components: [)?updateURIsURL=file:/C:/Dir(1]
+// -   Fragment: null
+// -       Host: 
+// - Parameters: {}
+// -       Path: a.csv
+// -     Scheme: failover
+
+// The URI is parsed correctly when it is an escaped
+URI uri = new URI(""failover://()?updateURIsURL=file:/C:/Dir%281%29/a.csv"");
+CompositeData data = URISupport.parseComposite(uri);
+	
+// Parsed Composite Data: 
+// - Components: []
+// -   Fragment: null
+// -       Host: 
+// - Parameters: {updateURIsURL=file:/C:/Dir(1)/a.csv}
+// -       Path: null
+// -     Scheme: failover
+{code}
+
+I think {{URISupport}} should either throw an URISyntaxException or parse it correctly.
+See [RFC2396|http://www.ietf.org/rfc/rfc2396.txt]:
+{quote}
+Unreserved characters can be escaped without changing the semantics
+of the URI, but this should not be done unless the URI is being used
+in a context that does not allow the unescaped character to appear.
+{quote}
+
+By the way, the problem occurs in the method {{parseComposite(URI uri, CompositeData rc, String ssp)}}, at:
+
+{code}
+...
+p = ssp.lastIndexOf("")"");
+...
+{code}",Bug,04/May/12 11:59
+AMQ-3709,12541891,,"We created a monitor that utilizes calls to the web-console to determine stuck messages.  Occasionally, requests come back 404 (because the message disappears between calls) and the monitor dies because the XHTML for that page is invalid.  This patch makes the 404 and 500 pages valid in the eyes of the w3c markup validation service.
+
+Note: I'm placing the patch here because I do not see a place to upload it on this form.  If it appears later, I will attached.
+
+Index: activemq-web-console/src/main/webapp/500.html
+===================================================================
+--- activemq-web-console/src/main/webapp/500.html	(revision 1242141)
++++ activemq-web-console/src/main/webapp/500.html	(working copy)
+@@ -22,8 +22,7 @@
+  
+ <!DOCTYPE html PUBLIC ""-//W3C//DTD XHTML 1.0 Transitional//EN"" ""http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd""> 
+  
+-<!DOCTYPE html PUBLIC ""-//W3C//DTD HTML 4.01 Transitional//EN"" ""http://www.w3.org/TR/html4/loose.dtd""> 
+-<html> 
++<html xmlns='http://www.w3.org/1999/xhtml'> 
+ <head> 
+     <meta http-equiv=""Content-Type"" content=""text/html; charset=iso-8859-1"" /> 
+     <title>Apache ActiveMQ</title> 
+@@ -67,7 +66,7 @@
+                     <div class=""top_red_bar""> 
+                         <div id=""site-breadcrumbs""> 
+                         </div> 
+-                        <div id=""site-quicklinks""><P> 
++                        <div id=""site-quicklinks""><p> 
+                             <a href=""http://activemq.apache.org/support.html""
+                                title=""Get help and support using Apache ActiveMQ"">Support</a></p> 
+                         </div> 
+@@ -93,7 +92,7 @@
+                                     <div class=""navigation""> 
+                                         <div class=""navigation_top""> 
+                                             <div class=""navigation_bottom""> 
+-                                                <H3>Useful Links</H3> 
++                                                <h3>Useful Links</h3> 
+  
+                                                 <ul class=""alternate"" type=""square""> 
+                                                     <li><a href=""http://activemq.apache.org/""
+Index: activemq-web-console/src/main/webapp/404.html
+===================================================================
+--- activemq-web-console/src/main/webapp/404.html	(revision 1242141)
++++ activemq-web-console/src/main/webapp/404.html	(working copy)
+@@ -22,8 +22,7 @@
+  
+ <!DOCTYPE html PUBLIC ""-//W3C//DTD XHTML 1.0 Transitional//EN"" ""http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd""> 
+  
+-<!DOCTYPE html PUBLIC ""-//W3C//DTD HTML 4.01 Transitional//EN"" ""http://www.w3.org/TR/html4/loose.dtd""> 
+-<html> 
++<html xmlns='http://www.w3.org/1999/xhtml'> 
+ <head> 
+     <meta http-equiv=""Content-Type"" content=""text/html; charset=iso-8859-1"" /> 
+     <title>Apache ActiveMQ</title> 
+@@ -67,7 +66,7 @@
+                     <div class=""top_red_bar""> 
+                         <div id=""site-breadcrumbs""> 
+                         </div> 
+-                        <div id=""site-quicklinks""><P> 
++                        <div id=""site-quicklinks""><p> 
+                             <a href=""http://activemq.apache.org/support.html""
+                                title=""Get help and support using Apache ActiveMQ"">Support</a></p> 
+                         </div> 
+@@ -92,7 +91,7 @@
+                                     <div class=""navigation""> 
+                                         <div class=""navigation_top""> 
+                                             <div class=""navigation_bottom""> 
+-                                                <H3>Useful Links</H3> 
++                                                <h3>Useful Links</h3> 
+  
+                                                 <ul class=""alternate"" type=""square""> 
+                                                     <li><a href=""http://activemq.apache.org/""
+
+
+",Bug,08/Feb/12 22:44
+AMQ-3681,12539772,,"ActiveMQ is configured in a Master/Slave configuration with an Oracle database :
+http://activemq.apache.org/jdbc-master-slave.html
+http://servicemix.apache.org/clustering.html
+When the slave node is stopping, ""activemq-broker"" stays forever in the ""Stopping"" state.
+This is because the locking SQL statement cannot be interrupted by just closing the JDBC connection.  It is also needed to ""cancel"" the SQL statement.
+Here is a patch to DefaultDatabaseLocker which makes it compatible with Oracle.
+Thanks.
+
+{code}
+
+""Thread-92"" prio=10 tid=0x08c4d800 nid=0x1036 waiting for monitor entry [0x8ab3a000]
+   java.lang.Thread.State: BLOCKED (on object monitor)
+	at oracle.jdbc.driver.PhysicalConnection.isClosed(PhysicalConnection.java:1223)
+	- waiting to lock <0xad4367e0> (a oracle.jdbc.driver.T4CConnection)
+	at org.apache.commons.dbcp.DelegatingConnection.isClosed(DelegatingConnection.java:386)
+	at org.apache.commons.dbcp.DelegatingConnection.isClosed(DelegatingConnection.java:386)
+	at org.apache.commons.dbcp.PoolingDataSource$PoolGuardConnectionWrapper.isClosed(PoolingDataSource.java:201)
+	at org.apache.activemq.store.jdbc.DefaultDatabaseLocker.stop(DefaultDatabaseLocker.java:137)
+	at com.mycompany.PoolCloser.close(PoolCloser.java:77)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:39)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:25)
+	at java.lang.reflect.Method.invoke(Method.java:597)
+	at org.apache.aries.blueprint.utils.ReflectionUtils.invoke(ReflectionUtils.java:221)
+	at org.apache.aries.blueprint.container.ServiceListener.invokeMethod(ServiceListener.java:98)
+	at org.apache.aries.blueprint.container.ServiceListener.unregister(ServiceListener.java:65)
+{code}",Bug,25/Jan/12 14:41
+AMQ-3680,12539703,,"Creating this as follow-up on AMQ-3457.
+
+AMQ-3457 removed cleanup on call to close() for PooledConnection objects, causing temporary destinations to remain in the broker until all uses of the actual underlying ActiveMQ connection are closed.  Since those other uses of the underlying connection can be held indefinitely, or - on a very active system - there might be almost no time when there are no users of a connection, those temporary destinations essentially create a leak.
+
+The most correct operation would remove the temporary destination for each PooledConnection when it's close() method is called.
+
+Prior to AMQ-3457, updates for AMQ-2349 attempted to resolve this problem, but ended up being overly-aggressive, removing all of the temporary destinations from the underlying connection.  So, one PooledConnection's close() deleted temporary destinations for multiple PooledConnection objects which were still active.
+
+Test case and patch will be provided.",Bug,25/Jan/12 00:39
+AMQ-3506,12523721,,"When configuring a PooledConnectionFactory with maximumActive=1 and blockIfSessionPoolIsFull=true (default behavior for latter config) it is possible that multiple threads that concurrently try to use the same JMS connection to create a new session might create more sessions than the configured maximumActive limit.
+
+That's because the call to ConnectionPool.createSession() is not synchronized and if multiple threads try to call this method concurrently (on the same underlying JMS connection) then the if-condition in 
+{code:java}
+SessionKey key = new SessionKey(transacted, ackMode);
+SessionPool pool = cache.get(key);
+if (pool == null) {
+  pool = createSessionPool(key);
+  cache.put(key, pool);
+}
+{code}
+
+will evaluate to true for *all* threads and they all end up creating their own sessionPool using the same SessionKey properties. 
+Access to the if-condition needs to be synchronized so that only one session pool gets created. That will ensure that not more than the configured maximumActive number of sessions can get created. ",Bug,20/Sep/11 14:03
+AMQ-3471,12519961,,"The startup script bin/activemq has a bug in the code leg when the OS is of type darwin.  
+
+Without the fix, the script emits to the console:
+
+$  ./apache-activemq-5.5.0/bin/activemq console
+INFO: Using default configuration
+(you can configure options in one of these file: /etc/default/activemq /Users/petrovic/.activemqrc)
+
+INFO: Invoke the following command to create a configuration file
+./apache-activemq-5.5.0/bin/activemq setup [ /etc/default/activemq | /Users/petrovic/.activemqrc ]
+
+./apache-activemq-5.5.0/bin/activemq: line 252: [-z: command not found           <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+INFO: Using java '/System/Library/Frameworks/JavaVM.framework/Versions/1.6.0/Home/bin/java'
+...
+
+The following patch fixes this problem:
+
+$  diff -u apache-activemq-5.5.0/bin/activemq ../tools/apache-activemq-5.5.0/bin/activemq
+--- apache-activemq-5.5.0/bin/activemq	2011-03-28 11:39:43.000000000 -0700
++++ ../tools/apache-activemq-5.5.0/bin/activemq	2011-08-24 05:15:56.000000000 -0700
+@@ -249,7 +249,7 @@
+   CYGWIN*) OSTYPE=""cygwin"" ;;
+   Darwin*) 
+            OSTYPE=""darwin""
+-           if [-z ""$JAVA_HOME""] && [ ""$JAVACMD"" = ""auto"" ];then
++           if [ -z ""$JAVA_HOME"" ] && [ ""$JAVACMD"" = ""auto"" ];then
+              JAVA_HOME=/System/Library/Frameworks/JavaVM.framework/Home
+            fi
+            ;;
+
+",Bug,24/Aug/11 12:37
+AMQ-3214,12500963,,"-Have a multi-thread consumers running to consumer messages
+-Have Connection to have these :
+       		ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(brokerUrl);
+		connectionFactory.setUseAsyncSend(false);
+		connectionFactory.setDispatchAsync(false);
+		connectionFactory.setAlwaysSessionAsync(false);
+		connectionFactory.setAlwaysSyncSend(true);
+
+-Run the consumers for several hours and profile it
+-You will see there are threads with the name ""InactivityMonitor Async Task"" being spawning continuously
+
+This will cause the entire consumer system to slow down eventually due to thread context switching.  
+
+Suggestion to fix: we should not put a limit on the number of ""InactivityMonitor Async Task"" threads to be Max Integer.  There is a bug in Java lib that
+it will not stop a thread after a given idle time-to-live. We could fix this in the file InactivityMonitor.java
+",Bug,09/Mar/11 23:52
+AMQ-2866,12482054,,"Per the JMS docs, message priority should be between 0 and 9 inclusive. SimplePriorityMessageDispatchChannel.getPriority attempts to do that, but there's a bug when constraining the priority to be above 0.",Bug,11/Aug/10 14:55
+AMQ-2830,12482614,,"  Test Config:
+  <persistenceAdapter>
+            <kahaDB directory=""${activemq.base}/data/kahadb"" 
+		journalMaxFileLength=""32mb"" 
+		archiveDataLogs=""true""
+		directoryArchive=""${activemq.base}/archivedmsgs""
+		maxAsyncJobs=""10000""
+		databaseLockedWaitDelay=""10000""/>
+        </persistenceAdapter>
+
+
+Unable to configure archiveDataLogs=""true"", directoryArchive=""${activemq.base}/archivedmsgs"", databaseLockedWaitDelay=""10000""
+Throws similar errors for all the mentioned attributes.
+Keeps throwing th below error.
+
+0_20\jre
+  Heap sizes: current=15872k  free=14582k  max=506816k
+    JVM args: -Dcom.sun.management.jmxremote -Xmx512M -Dorg.apache.activemq.UseD
+edicatedTaskRunner=true -Djava.util.logging.config.file=logging.properties -Dact
+ivemq.classpath=C:\Program Files (x86)\apache-activemq-5.3.2\bin\../conf; -Dacti
+vemq.home=C:\Program Files (x86)\apache-activemq-5.3.2\bin\.. -Dactivemq.base=C:
+\Program Files (x86)\apache-activemq-5.3.2\bin\..
+ACTIVEMQ_HOME: C:\Program Files (x86)\apache-activemq-5.3.2\bin\..
+ACTIVEMQ_BASE: C:\Program Files (x86)\apache-activemq-5.3.2\bin\..
+Loading message broker from: xbean:file:C:/Program%20Files%20(x86)/apache-active
+mq-5.3.2/conf/activemq-stomp1.xml
+ERROR: java.lang.RuntimeException: Failed to execute start task. Reason: org.spr
+ingframework.beans.factory.BeanCreationException: Error creating bean with name
+'org.apache.activemq.xbean.XBeanBrokerService#0' defined in URL [file:C:/Program
+ Files (x86)/apache-activemq-5.3.2/conf/activemq-stomp1.xml]: Cannot create inne
+r bean '(inner bean)' of type [org.apache.activemq.store.kahadb.KahaDBPersistenc
+eAdapter] while setting bean property 'persistenceAdapter'; nested exception is
+org.springframework.beans.factory.BeanCreationException: Error creating bean wit
+h name '(inner bean)#1' defined in URL [file:C:/Program Files (x86)/apache-activ
+emq-5.3.2/conf/activemq-stomp1.xml]: Error setting property values; nested excep
+tion is org.springframework.beans.NotWritablePropertyException: Invalid property
+ 'directoryArchive' of bean class [org.apache.activemq.store.kahadb.KahaDBPersis
+tenceAdapter]: Bean property 'directoryArchive' is not writable or has an invali
+d setter method. Does the parameter type of the setter match the return type of
+the getter?
+java.lang.RuntimeException: Failed to execute start task. Reason: org.springfram
+ework.beans.factory.BeanCreationException: Error creating bean with name 'org.ap
+ache.activemq.xbean.XBeanBrokerService#0' defined in URL [file:C:/Program Files
+(x86)/apache-activemq-5.3.2/conf/activemq-stomp1.xml]: Cannot create inner bean
+'(inner bean)' of type [org.apache.activemq.store.kahadb.KahaDBPersistenceAdapte
+r] while setting bean property 'persistenceAdapter'; nested exception is org.spr
+ingframework.beans.factory.BeanCreationException: Error creating bean with name
+'(inner bean)#1' defined in URL [file:C:/Program Files (x86)/apache-activemq-5.3
+.2/conf/activemq-stomp1.xml]: Error setting property values; nested exception is
+ org.springframework.beans.NotWritablePropertyException: Invalid property 'direc
+toryArchive' of bean class [org.apache.activemq.store.kahadb.KahaDBPersistenceAd
+apter]: Bean property 'directoryArchive' is not writable or has an invalid sette
+r method. Does the parameter type of the setter match the return type of the get
+ter?
+        at org.apache.activemq.console.command.StartCommand.runTask(StartCommand
+.java:98)
+        at org.apache.activemq.console.command.AbstractCommand.execute(AbstractC
+ommand.java:57)
+        at org.apache.activemq.console.command.ShellCommand.runTask(ShellCommand
+.java:136)
+        at org.apache.activemq.console.command.AbstractCommand.execute(AbstractC
+ommand.java:57)
+        at org.apache.activemq.console.command.ShellCommand.main(ShellCommand.ja
+va:82)
+        at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+        at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.
+java:39)
+        at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAcces
+sorImpl.java:25)
+        at java.lang.reflect.Method.invoke(Method.java:597)
+        at org.apache.activemq.console.Main.runTaskClass(Main.java:251)
+        at org.apache.activemq.console.Main.main(Main.java:107)
+Caused by: org.springframework.beans.factory.BeanCreationException: Error creati
+ng bean with name 'org.apache.activemq.xbean.XBeanBrokerService#0' defined in UR
+L [file:C:/Program Files (x86)/apache-activemq-5.3.2/conf/activemq-stomp1.xml]:
+Cannot create inner bean '(inner bean)' of type [org.apache.activemq.store.kahad
+b.KahaDBPersistenceAdapter] while setting bean property 'persistenceAdapter'; ne
+sted exception is org.springframework.beans.factory.BeanCreationException: Error
+ creating bean with name '(inner bean)#1' defined in URL [file:C:/Program Files
+(x86)/apache-activemq-5.3.2/conf/activemq-stomp1.xml]: Error setting property va
+lues; nested exception is org.springframework.beans.NotWritablePropertyException
+: Invalid property 'directoryArchive' of bean class [org.apache.activemq.store.k
+ahadb.KahaDBPersistenceAdapter]: Bean property 'directoryArchive' is not writabl
+e or has an invalid setter method. Does the parameter type of the setter match t
+he return type of the getter?
+        at org.springframework.beans.factory.support.BeanDefinitionValueResolver
+.resolveInnerBean(BeanDefinitionValueResolver.java:230)
+        at org.springframework.beans.factory.support.BeanDefinitionValueResolver
+.resolveValueIfNecessary(BeanDefinitionValueResolver.java:122)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBean
+Factory.applyPropertyValues(AbstractAutowireCapableBeanFactory.java:1245)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBean
+Factory.populateBean(AbstractAutowireCapableBeanFactory.java:1010)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBean
+Factory.doCreateBean(AbstractAutowireCapableBeanFactory.java:472)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBean
+Factory$1.run(AbstractAutowireCapableBeanFactory.java:409)
+        at java.security.AccessController.doPrivileged(Native Method)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBean
+Factory.createBean(AbstractAutowireCapableBeanFactory.java:380)
+        at org.springframework.beans.factory.support.AbstractBeanFactory$1.getOb
+ject(AbstractBeanFactory.java:264)
+        at org.springframework.beans.factory.support.DefaultSingletonBeanRegistr
+y.getSingleton(DefaultSingletonBeanRegistry.java:222)
+        at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBe
+an(AbstractBeanFactory.java:261)
+        at org.springframework.beans.factory.support.AbstractBeanFactory.getBean
+(AbstractBeanFactory.java:185)
+        at org.springframework.beans.factory.support.AbstractBeanFactory.getBean
+(AbstractBeanFactory.java:164)
+        at org.springframework.beans.factory.support.DefaultListableBeanFactory.
+preInstantiateSingletons(DefaultListableBeanFactory.java:429)
+        at org.springframework.context.support.AbstractApplicationContext.finish
+BeanFactoryInitialization(AbstractApplicationContext.java:728)
+        at org.springframework.context.support.AbstractApplicationContext.refres
+h(AbstractApplicationContext.java:380)
+        at org.apache.xbean.spring.context.ResourceXmlApplicationContext.<init>(
+ResourceXmlApplicationContext.java:64)
+        at org.apache.xbean.spring.context.ResourceXmlApplicationContext.<init>(
+ResourceXmlApplicationContext.java:52)
+        at org.apache.activemq.xbean.XBeanBrokerFactory.createApplicationContext
+(XBeanBrokerFactory.java:96)
+        at org.apache.activemq.xbean.XBeanBrokerFactory.createBroker(XBeanBroker
+Factory.java:52)
+        at org.apache.activemq.broker.BrokerFactory.createBroker(BrokerFactory.j
+ava:71)
+        at org.apache.activemq.broker.BrokerFactory.createBroker(BrokerFactory.j
+ava:54)
+        at org.apache.activemq.console.command.StartCommand.startBroker(StartCom
+mand.java:115)
+        at org.apache.activemq.console.command.StartCommand.runTask(StartCommand
+.java:91)
+        ... 10 more
+Caused by: org.springframework.beans.factory.BeanCreationException: Error creati
+ng bean with name '(inner bean)#1' defined in URL [file:C:/Program Files (x86)/a
+pache-activemq-5.3.2/conf/activemq-stomp1.xml]: Error setting property values; n
+ested exception is org.springframework.beans.NotWritablePropertyException: Inval
+id property 'directoryArchive' of bean class [org.apache.activemq.store.kahadb.K
+ahaDBPersistenceAdapter]: Bean property 'directoryArchive' is not writable or ha
+s an invalid setter method. Does the parameter type of the setter match the retu
+rn type of the getter?
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBean
+Factory.applyPropertyValues(AbstractAutowireCapableBeanFactory.java:1279)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBean
+Factory.populateBean(AbstractAutowireCapableBeanFactory.java:1010)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBean
+Factory.doCreateBean(AbstractAutowireCapableBeanFactory.java:472)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBean
+Factory$1.run(AbstractAutowireCapableBeanFactory.java:409)
+        at java.security.AccessController.doPrivileged(Native Method)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBean
+Factory.createBean(AbstractAutowireCapableBeanFactory.java:380)
+        at org.springframework.beans.factory.support.BeanDefinitionValueResolver
+.resolveInnerBean(BeanDefinitionValueResolver.java:219)
+        ... 33 more
+Caused by: org.springframework.beans.NotWritablePropertyException: Invalid prope
+rty 'directoryArchive' of bean class [org.apache.activemq.store.kahadb.KahaDBPer
+sistenceAdapter]: Bean property 'directoryArchive' is not writable or has an inv
+alid setter method. Does the parameter type of the setter match the return type
+of the getter?
+        at org.springframework.beans.BeanWrapperImpl.setPropertyValue(BeanWrappe
+rImpl.java:801)
+        at org.springframework.beans.BeanWrapperImpl.setPropertyValue(BeanWrappe
+rImpl.java:651)
+        at org.springframework.beans.AbstractPropertyAccessor.setPropertyValues(
+AbstractPropertyAccessor.java:78)
+        at org.springframework.beans.AbstractPropertyAccessor.setPropertyValues(
+AbstractPropertyAccessor.java:59)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBean
+Factory.applyPropertyValues(AbstractAutowireCapableBeanFactory.java:1276)
+        ... 39 more
+ERROR: java.lang.Exception: org.springframework.beans.factory.BeanCreationExcept
+ion: Error creating bean with name 'org.apache.activemq.xbean.XBeanBrokerService
+#0' defined in URL [file:C:/Program Files (x86)/apache-activemq-5.3.2/conf/activ
+emq-stomp1.xml]: Cannot create inner bean '(inner bean)' of type [org.apache.act
+ivemq.store.kahadb.KahaDBPersistenceAdapter] while setting bean property 'persis
+tenceAdapter'; nested exception is org.springframework.beans.factory.BeanCreatio
+nException: Error creating bean with name '(inner bean)#1' defined in URL [file:
+C:/Program Files (x86)/apache-activemq-5.3.2/conf/activemq-stomp1.xml]: Error se
+tting property values; nested exception is org.springframework.beans.NotWritable
+PropertyException: Invalid property 'directoryArchive' of bean class [org.apache
+.activemq.store.kahadb.KahaDBPersistenceAdapter]: Bean property 'directoryArchiv
+e' is not writable or has an invalid setter method. Does the parameter type of t
+he setter match the return type of the getter?
+java.lang.Exception: org.springframework.beans.factory.BeanCreationException: Er
+ror creating bean with name 'org.apache.activemq.xbean.XBeanBrokerService#0' def
+ined in URL [file:C:/Program Files (x86)/apache-activemq-5.3.2/conf/activemq-sto
+mp1.xml]: Cannot create inner bean '(inner bean)' of type [org.apache.activemq.s
+tore.kahadb.KahaDBPersistenceAdapter] while setting bean property 'persistenceAd
+apter'; nested exception is org.springframework.beans.factory.BeanCreationExcept
+ion: Error creating bean with name '(inner bean)#1' defined in URL [file:C:/Prog
+ram Files (x86)/apache-activemq-5.3.2/conf/activemq-stomp1.xml]: Error setting p
+roperty values; nested exception is org.springframework.beans.NotWritablePropert
+yException: Invalid property 'directoryArchive' of bean class [org.apache.active
+mq.store.kahadb.KahaDBPersistenceAdapter]: Bean property 'directoryArchive' is n
+ot writable or has an invalid setter method. Does the parameter type of the sett
+er match the return type of the getter?
+        at org.apache.activemq.console.command.StartCommand.runTask(StartCommand
+.java:99)
+        at org.apache.activemq.console.command.AbstractCommand.execute(AbstractC
+ommand.java:57)
+        at org.apache.activemq.console.command.ShellCommand.runTask(ShellCommand
+.java:136)
+        at org.apache.activemq.console.command.AbstractCommand.execute(AbstractC
+ommand.java:57)
+        at org.apache.activemq.console.command.ShellCommand.main(ShellCommand.ja
+va:82)
+        at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+        at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.
+java:39)
+        at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAcces
+sorImpl.java:25)
+        at java.lang.reflect.Method.invoke(Method.java:597)
+        at org.apache.activemq.console.Main.runTaskClass(Main.java:251)
+        at org.apache.activemq.console.Main.main(Main.java:107)
+Caused by: org.springframework.beans.factory.BeanCreationException: Error creati
+ng bean with name 'org.apache.activemq.xbean.XBeanBrokerService#0' defined in UR
+L [file:C:/Program Files (x86)/apache-activemq-5.3.2/conf/activemq-stomp1.xml]:
+Cannot create inner bean '(inner bean)' of type [org.apache.activemq.store.kahad
+b.KahaDBPersistenceAdapter] while setting bean property 'persistenceAdapter'; ne
+sted exception is org.springframework.beans.factory.BeanCreationException: Error
+ creating bean with name '(inner bean)#1' defined in URL [file:C:/Program Files
+(x86)/apache-activemq-5.3.2/conf/activemq-stomp1.xml]: Error setting property va
+lues; nested exception is org.springframework.beans.NotWritablePropertyException
+: Invalid property 'directoryArchive' of bean class [org.apache.activemq.store.k
+ahadb.KahaDBPersistenceAdapter]: Bean property 'directoryArchive' is not writabl
+e or has an invalid setter method. Does the parameter type of the setter match t
+he return type of the getter?
+        at org.springframework.beans.factory.support.BeanDefinitionValueResolver
+.resolveInnerBean(BeanDefinitionValueResolver.java:230)
+        at org.springframework.beans.factory.support.BeanDefinitionValueResolver
+.resolveValueIfNecessary(BeanDefinitionValueResolver.java:122)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBean
+Factory.applyPropertyValues(AbstractAutowireCapableBeanFactory.java:1245)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBean
+Factory.populateBean(AbstractAutowireCapableBeanFactory.java:1010)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBean
+Factory.doCreateBean(AbstractAutowireCapableBeanFactory.java:472)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBean
+Factory$1.run(AbstractAutowireCapableBeanFactory.java:409)
+        at java.security.AccessController.doPrivileged(Native Method)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBean
+Factory.createBean(AbstractAutowireCapableBeanFactory.java:380)
+        at org.springframework.beans.factory.support.AbstractBeanFactory$1.getOb
+ject(AbstractBeanFactory.java:264)
+        at org.springframework.beans.factory.support.DefaultSingletonBeanRegistr
+y.getSingleton(DefaultSingletonBeanRegistry.java:222)
+        at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBe
+an(AbstractBeanFactory.java:261)
+        at org.springframework.beans.factory.support.AbstractBeanFactory.getBean
+(AbstractBeanFactory.java:185)
+        at org.springframework.beans.factory.support.AbstractBeanFactory.getBean
+(AbstractBeanFactory.java:164)
+        at org.springframework.beans.factory.support.DefaultListableBeanFactory.
+preInstantiateSingletons(DefaultListableBeanFactory.java:429)
+        at org.springframework.context.support.AbstractApplicationContext.finish
+BeanFactoryInitialization(AbstractApplicationContext.java:728)
+        at org.springframework.context.support.AbstractApplicationContext.refres
+h(AbstractApplicationContext.java:380)
+        at org.apache.xbean.spring.context.ResourceXmlApplicationContext.<init>(
+ResourceXmlApplicationContext.java:64)
+        at org.apache.xbean.spring.context.ResourceXmlApplicationContext.<init>(
+ResourceXmlApplicationContext.java:52)
+        at org.apache.activemq.xbean.XBeanBrokerFactory.createApplicationContext
+(XBeanBrokerFactory.java:96)
+        at org.apache.activemq.xbean.XBeanBrokerFactory.createBroker(XBeanBroker
+Factory.java:52)
+        at org.apache.activemq.broker.BrokerFactory.createBroker(BrokerFactory.j
+ava:71)
+        at org.apache.activemq.broker.BrokerFactory.createBroker(BrokerFactory.j
+ava:54)
+        at org.apache.activemq.console.command.StartCommand.startBroker(StartCom
+mand.java:115)
+        at org.apache.activemq.console.command.StartCommand.runTask(StartCommand
+.java:91)
+        ... 10 more
+Caused by: org.springframework.beans.factory.BeanCreationException: Error creati
+ng bean with name '(inner bean)#1' defined in URL [file:C:/Program Files (x86)/a
+pache-activemq-5.3.2/conf/activemq-stomp1.xml]: Error setting property values; n
+ested exception is org.springframework.beans.NotWritablePropertyException: Inval
+id property 'directoryArchive' of bean class [org.apache.activemq.store.kahadb.K
+ahaDBPersistenceAdapter]: Bean property 'directoryArchive' is not writable or ha
+s an invalid setter method. Does the parameter type of the setter match the retu
+rn type of the getter?
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBean
+Factory.applyPropertyValues(AbstractAutowireCapableBeanFactory.java:1279)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBean
+Factory.populateBean(AbstractAutowireCapableBeanFactory.java:1010)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBean
+Factory.doCreateBean(AbstractAutowireCapableBeanFactory.java:472)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBean
+Factory$1.run(AbstractAutowireCapableBeanFactory.java:409)
+        at java.security.AccessController.doPrivileged(Native Method)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBean
+Factory.createBean(AbstractAutowireCapableBeanFactory.java:380)
+        at org.springframework.beans.factory.support.BeanDefinitionValueResolver
+.resolveInnerBean(BeanDefinitionValueResolver.java:219)
+        ... 33 more
+Caused by: org.springframework.beans.NotWritablePropertyException: Invalid prope
+rty 'directoryArchive' of bean class [org.apache.activemq.store.kahadb.KahaDBPer
+sistenceAdapter]: Bean property 'directoryArchive' is not writable or has an inv
+alid setter method. Does the parameter type of the setter match the return type
+of the getter?
+        at org.springframework.beans.BeanWrapperImpl.setPropertyValue(BeanWrappe
+rImpl.java:801)
+        at org.springframework.beans.BeanWrapperImpl.setPropertyValue(BeanWrappe
+rImpl.java:651)
+        at org.springframework.beans.AbstractPropertyAccessor.setPropertyValues(
+AbstractPropertyAccessor.java:78)
+        at org.springframework.beans.AbstractPropertyAccessor.setPropertyValues(
+AbstractPropertyAccessor.java:59)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBean
+Factory.applyPropertyValues(AbstractAutowireCapableBeanFactory.java:1276)
+        ... 39 more
+C:\Program Files (x86)\apache-activemq-5.3.2\bin>",Bug,16/Jul/10 10:28
+AMQ-2805,12482892,,"The page http://activemq.apache.org/javadocs.html links to the bad URL http://activemq.apache.org/cms/html/.
+
+It should instead point to http://activemq.apache.org/cms/.
+
+The page served by the erroneous URL looks like it's actually the target of a bad redirect within the CMS sub-pages.  You'll notice that any of the relative URL links keep returning the same page (as they are all bad URLs), whereas the page returned by the correct URL contains correct links for those pages.
+
+See related issue https://issues.apache.org/activemq/browse/AMQCPP-299",Bug,28/Jun/10 19:44
+AMQ-2802,12483525,,"For sites running on a port other than 80 RewriteCond %{HTTP_HOST} !^www\.angosso\.net [www.angosso.net/]% RewriteCond %{HTTP_HOST} !^Angosso^% RewriteCond %{SERVER_PORT} !^80% RewriteRule ^/(.*) http://www.angosso.net:80%{ANGOSSO_NET} /8080% [L,R] RewriteRule ^FR-news\.html http://www.angosso.net/news/index.html [P] RewriteRule ^http://www\.remotesite\.net/(.*)$mirroran_user /mirror/of/remotesite/$http://www.angosso.net/index.html -->patchfile resolve--> Parent Directory /* $Id$Angosso.net/index.html/ */ incubation public void outputConfigurationHeader(IThreadContext threadContext, IHTTPOutput out, ConfigParams parameters, ArrayList tabsArray) throws LCFException, IOException { tabsArray.add(""Angosso Siteweb Inc.""); tabsArray.add(""http://www.angosso.net/""); out.print( ""<script type=\""text/javascript\"">\n""+ ""<!--\n""+ ""\n""+ ""function checkConfig()\n""+ ""{\n""+ "" if (editconnection.angosso.netserverport.value != \""\"" && !isInteger(editconnection.angosso.netserverport.value))\n""+ "" return true;\n""+ ""function checkConfigForSave()\n""+ public String[www.angosso.net/index.html/] getForcedAcls() { return orderedTokens; } } } ",Bug,26/Jun/10 11:14
+AMQ-2768,12483153,,"Trying to enable HTTPS transportConnector in activemq.xml file, it is impossible to make it communicate in SSL.
+
+I added the line:
+<transportConnector name=""https"" uri=""https://localhost:8443"" enableStatusMonitor=""true""/> 
+
+in the activemq.xml file,
+
+and i can see at startup that a plain text socket seem to have been created, instead of a ssl one:
+
+14:36:23,119  INFO org.mortbay.log.Slf4jLog 67 <main> Started SocketConnector@localhost:8443
+14:36:23,119  INFO org.apache.activemq.broker.TransportConnector 250 <main> Connector https Started
+14:36:23,119  INFO org.mortbay.log.Slf4jLog 67 <main> jetty-6.1.22
+
+When i connect with a https client (based on Spring JmsTemplate class), i cannot connect. I have to mention also that i can successfully connect using ssl connection (so the certificates are OK) and also in HTTP.
+
+Thanks a lot for your work!",Bug,08/Jun/10 12:43
+AMQ-2434,12483090,,"In spring.schemas, the XSD url given is ""http://activemq.apache.org/schema/core/activemq-core.xsd"". However, this XSD file does not exist in reality, so using this URL will always give XML errors while using any IDE. If we use a correct URL (eg. ""http://activemq.apache.org/schema/core/activemq-core-5.2.0.xsd"") everything will work fine, but problems will occur if the application can't connect to the URL, since the XSD will not be loaded.
+
+I believe that adding a line like the following to spring.schemas is going to solve the problem
+http\://activemq.apache.org/schema/core/activemq-core-5.2.0.xsd=activemq.xsd
+
+Of course the XSD URL would change for each version.
+",Bug,01/Oct/09 08:56
+AMQ-2430,12483703,,"When doing a massive uploading of blobs with activemq 5.2 (same thing on svn trunk) on the embedded RESTful fileserver, you get a ""too many open files"" error and the system doesn't work anymore.
+
+Steps to reproduce :
+* send a BlobMessage with ""jms.blobTransferPolicy.uploadUrl=http://127.0.0.1:8161/fileserver/""
+* use ""lsof |grep fileserver"" command and you will see your uploaded BLOB still open
+
+The fix seems really easy (works ok for me) :
+* open ""RestFilter.java""
+* locate the ""doPut()"" method
+* change :
+{code} 
+try {
+    IO.copy(request.getInputStream(), out);
+ } catch (IOException e) {
+{code}
+
+with :
+
+{code} 
+try {
+    IO.copy(request.getInputStream(), out);
+    out.close();
+ } catch (IOException e) {
+{code}
+
+
+",Bug,28/Sep/09 20:37
+AMQ-2334,12483757,,"Shared master/slave setup, described here http://activemq.apache.org/shared-file-system-master-slave.html
+Scenario:
+1. Transacted consumer receives a message
+2. Transacted consumer disconnects prior to committing
+3. Transacted consumer #2 receives the same message.
+
+Normally consumer #2 sees that message as getJMSRedelivered() = true.  However, if the broker fails and another takes over from the data dir between step 1 and 3, the redelivery is set as false - even though a consumer has, in fact, seen the message before.  See attached unit test.",Bug,28/Jul/09 23:56
+AMQ-2299,12483575,,"Hi,
+
+I have downloaded activemq-ra.rar and activemq-jms-ds from http://activemq.apache.org/integrating-apache-activemq-with-jboss.html and placed  in C:\work\jboss-5.0.0.GA\server\default\deploy.  After that i have restarted the JBOSS server and i got the following messages in log file.
+
+*** CONTEXTS MISSING DEPENDENCIES: Name -> Dependency{Required State:Actual State}
+
+activemq.queue:name=outboundQueue
+ -> jboss.jca:name='activemq-ra.rar',service=RARDeployment{Create:** NOT FOUND Depends on 'jboss.jca:name='activemq-ra.rar',service=RARDeployment' **}
+
+activemq.topic:name=inboundTopic
+ -> jboss.jca:name='activemq-ra.rar',service=RARDeployment{Create:** NOT FOUND Depends on 'jboss.jca:name='activemq-ra.rar',service=RARDeployment' **}
+
+jboss.jca:name=activemq/QueueConnectionFactory,service=ConnectionFactoryBinding
+ -> jboss.jca:name=activemq/QueueConnectionFactory,service=TxCM{Create:Configured}
+
+jboss.jca:name=activemq/QueueConnectionFactory,service=ManagedConnectionFactory
+ -> jboss.jca:name='activemq-ra.rar',service=RARDeployment{Create:** NOT FOUND Depends on 'jboss.jca:name='activemq-ra.rar',service=RARDeployment' **}
+
+jboss.jca:name=activemq/QueueConnectionFactory,service=ManagedConnectionPool
+ -> jboss.jca:name=activemq/QueueConnectionFactory,service=ManagedConnectionFactory{Create:Configured}
+
+jboss.jca:name=activemq/QueueConnectionFactory,service=TxCM
+ -> jboss.jca:name=activemq/QueueConnectionFactory,service=ManagedConnectionPool{Create:Configured}
+
+jboss.jca:name=activemq/TopicConnectionFactory,service=ConnectionFactoryBinding
+ -> jboss.jca:name=activemq/TopicConnectionFactory,service=TxCM{Create:Configured}
+
+jboss.jca:name=activemq/TopicConnectionFactory,service=ManagedConnectionFactory
+ -> jboss.jca:name='activemq-ra.rar',service=RARDeployment{Create:** NOT FOUND Depends on 'jboss.jca:name='activemq-ra.rar',service=RARDeployment' **}
+
+jboss.jca:name=activemq/TopicConnectionFactory,service=ManagedConnectionPool
+ -> jboss.jca:name=activemq/TopicConnectionFactory,service=ManagedConnectionFactory{Create:Configured}
+
+jboss.jca:name=activemq/TopicConnectionFactory,service=TxCM
+ -> jboss.jca:name=activemq/TopicConnectionFactory,service=ManagedConnectionPool{Create:Configured}
+
+
+*** CONTEXTS IN ERROR: Name -> Error
+
+jboss.jca:name='activemq-ra.rar',service=RARDeployment -> ** NOT FOUND Depends on 'jboss.jca:name='activemq-ra.rar',service=RARDeployment' **
+
+vfsfile:/C:/work/jboss-5.0.0.GA/server/default/deploy/activemq-ra.rar/ -> java.io.IOException: The filename, directory name, or volume label syntax is incorrect
+
+
+
+However activemq is up and running in JBOSS 4.0.4.
+
+Please provide the solution.
+
+Thanks
+Veda",Bug,23/Jun/09 18:57
+AMQ-2233,12483038,,"After rollback received messages not re-presented.  If I receive in a transaction and then roll back the messages should be re-presented in the next transaction.  This used to work in 5.1.0, but is broken in 5.2.0.
+
+You can browse the Queue in JMX after the rollback and see that the messages are still there, but they are not received by a consumer in the same process.
+
+Here's a test case (fails on the checkPostConditions()):
+
+{code}
+public class RawRollbackTests {
+	
+	private static ConnectionFactory connectionFactory;
+	private static Destination queue;
+	private static BrokerService broker;
+
+	@BeforeClass
+	public static void clean() throws Exception {
+		FileUtils.deleteDirectory(new File(""activemq-data""));
+		broker = new BrokerService();
+		broker.setUseJmx(true);
+		broker.start();
+		ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory();
+		connectionFactory.setBrokerURL(""vm://localhost?async=false"");
+		RawRollbackTests.connectionFactory = connectionFactory;
+		queue = new ActiveMQQueue(""queue"");
+	}
+
+	@AfterClass
+	public static void close() throws Exception {
+		broker.stop();
+	}
+
+	@Before
+	public void clearData() throws Exception {
+		getMessages(false); // drain queue
+		convertAndSend(""foo"");
+		convertAndSend(""bar"");
+	}
+
+
+	@After
+	public void checkPostConditions() throws Exception {
+
+		Thread.sleep(1000L);
+		List<String> list = getMessages(false);
+		assertEquals(2, list.size());
+
+	}
+
+	@Test
+	public void testReceiveMessages() throws Exception {
+
+		List<String> list = getMessages(true);
+		assertEquals(2, list.size());
+		assertTrue(list.contains(""foo""));
+
+	}
+	
+	private void convertAndSend(String msg) throws Exception {
+		Connection connection = connectionFactory.createConnection();
+		connection.start();
+		Session session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
+		MessageProducer producer = session.createProducer(queue);
+		producer.send(session.createTextMessage(msg));
+		producer.close();
+		session.commit();
+		session.close();
+		connection.close();
+	}
+
+	private List<String> getMessages(boolean rollback) throws Exception {
+		Connection connection = connectionFactory.createConnection();
+		connection.start();
+		Session session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
+		String next = """";
+		List<String> msgs = new ArrayList<String>();
+		while (next != null) {
+			next = (String) receiveAndConvert(session);
+			if (next != null)
+				msgs.add(next);
+		}
+		if (rollback) {
+			session.rollback();
+		} else {
+			session.commit();
+		}
+		session.close();
+		connection.close();
+		return msgs;
+	}
+
+	private String receiveAndConvert(Session session) throws Exception {
+		MessageConsumer consumer = session.createConsumer(queue);
+		Message message = consumer.receive(100L);
+		consumer.close();
+		if (message==null) {
+			return null;
+		}
+		return ((TextMessage)message).getText();
+	}
+}
+{code}",Bug,28/Apr/09 12:08
+AMQ-2196,12483247,,"InactivityMonitor should not simply use the minimum of the local and remote maxInactivityDuration parameter
+
+InactivityMonitor.java uses the following configuration
+        readCheckTime = Math.min(localWireFormatInfo.getMaxInactivityDuration(), remoteWireFormatInfo.getMaxInactivityDuration());
+        initialDelayTime =  Math.min(localWireFormatInfo.getMaxInactivityDurationInitalDelay(), remoteWireFormatInfo.getMaxInactivityDurationInitalDelay());
+
+Because of this, I can't simply define a maxInactivityDuration on my JMS server.  I need to make sure that the clients specify a value that is greater then or equal to the server configured value.  
+
+CMS doesn't yet supply this parameter when it makes an openwire connection so in my mixed Java/C++ application environment, I can't bump the inactivity timeout > 30s (the default).  Why should the server setting for how long to go before timing out a connection be influenced by what the client requests?  Client can always terminate the connection.
+
+I suggest that this be changed to
+        readCheckTime = localWireFormatInfo.getMaxInactivityDuration();
+        initialDelayTime = localWireFormatInfo.getMaxInactivityDurationInitalDelay();
+
+
+",Bug,03/Apr/09 18:30
+AMQ-2175,12482845,,"while reciveing the messages from Queue, I got the exception below...
+
+Exception occurred : java.lang.ClassCastException: org.apache.activemq.command.ActiveMQQueue
+     [java] 
+
+
+
+org.apache.activemq.command.ActiveMQQueue at QueueConsumer.main(Unknown Source)",Bug,23/Mar/09 06:21
+AMQ-2138,12483602,,"We discovered a memory leak in the ActiveMQConnection class.
+In our setup we have an activemq 5.1 embedded in our webapplication. On undeployemnt (more specially on connection close) the ThreadPoolExecutor is kept in memory and could not be garbage collected, because of the ThreadFactory which is loaded by our webapp classloader. A reference to it is held by the ThreadPoolExecutor.
+This is likly a bug in the JDK TheadPoolExecutor but it could be fixed by setting a default ThreadFactory before shutdown.",Bug,23/Feb/09 10:26
+AMQ-2059,12482502,,"i'm using activemq 5.2.
+the transportation is very reliable when i use tcp protocol.but it's always unreliable via http protocol.
+and i get the exception like this:
+
+java.net.SocketException: Connection reset
+	at java.net.SocketInputStream.read(SocketInputStream.java:168)
+	at org.mortbay.io.ByteArrayBuffer.readFrom(ByteArrayBuffer.java:384)
+	at org.mortbay.io.bio.StreamEndPoint.fill(StreamEndPoint.java:107)
+	at org.mortbay.jetty.bio.SocketConnector$Connection.fill(SocketConnector.java:198)
+	at org.mortbay.jetty.HttpParser.parseNext(HttpParser.java:287)
+	at org.mortbay.jetty.HttpParser.parseAvailable(HttpParser.java:209)
+	at org.mortbay.jetty.HttpConnection.handle(HttpConnection.java:407)
+	at org.mortbay.jetty.bio.SocketConnector$Connection.run(SocketConnector.java:235)
+	at org.mortbay.thread.QueuedThreadPool$PoolThread.run(QueuedThreadPool.java:526)",Bug,11/Jan/09 12:19
+AMQ-1955,12483928,,"MessageServlet inside activemq-web will pull maxMessages+1 messages off of the queue but only write a response containing maxMessages. 
+ 
+After some debugging, I figured out that the problem is with the while loop that reads messages inside the doMessages method (and doMessagesWithoutContinuation).  It always reads a message at the end of the loop, without first checking to see if maxMessages has already been reached. 
+
+Attached is a patch that corrects this issue.",Bug,26/Sep/08 14:46
+AMQ-1942,12483322,,"JMS SQL92 numeric selectors, such as 
+  - < > <= >=
+  - BETWEEN val AND val
+
+Fail to work via STOMP.
+
+Possible solutions:
+  1.  String Operands to numeric selector operators are converted to Numeric types
+       - only in STOMP?
+  2.  Explicit casting to SQL92 Numeric types becomes supported in selectors, ie
+       - ( INTEGER(field) <= 5)
+
+",Bug,17/Sep/08 15:59
+AMQ-1924,12482683,,"i am trying to invoke a webservice using JMS transport. (SOAP over JMS). i have configured Axis2.xml properly, added following entry http://ws.apache.org/axis2/1_1/jms-transport.html followed this url for adding these entry.
+
+ <transportReceiver name=""jms"" class=""org.apache.axis2.transport.jms.JMSListener"">
+       <parameter name=""myTopicConnectionFactory"">
+        	<parameter name=""java.naming.factory.initial"">org.apache.activemq.jndi.ActiveMQInitialContextFactory</parameter>
+        	<parameter name=""java.naming.provider.url"">tcp://localhost:61616</parameter>
+        	<parameter name=""transport.jms.ConnectionFactoryJNDIName"">TopicConnectionFactory</parameter>
+        </parameter>
+
+        <parameter name=""myQueueConnectionFactory"">
+        	<parameter name=""java.naming.factory.initial"">org.apache.activemq.jndi.ActiveMQInitialContextFactory</parameter>
+        	<parameter name=""java.naming.provider.url"">tcp://localhost:61616</parameter>
+        	<parameter name=""transport.jms.ConnectionFactoryJNDIName"">QueueConnectionFactory</parameter>
+        </parameter>
+	
+        <parameter name=""default"">
+        	<parameter name=""java.naming.factory.initial"">org.apache.activemq.jndi.ActiveMQInitialContextFactory</parameter>
+        	<parameter name=""java.naming.provider.url"">tcp://localhost:61616</parameter>
+        	<parameter name=""transport.jms.ConnectionFactoryJNDIName"">QueueConnectionFactory</parameter>
+        </parameter>
+    </transportReceiver>
+
+i am able to deploy the webservice in Axis2 and wsdl was also generated properly. Using ActiveMQAxisClient.java program invoking the webservice. The webserice is getting invoked and seeing loggers added in the webservice method. But the method is not getting properly and getting the below exception,
+
+log4j:WARN No appenders could be found for logger (org.apache.axis.AxisEngine).
+log4j:WARN Please initialize the log4j system properly.
+before invoke
+Exception in thread ""main"" AxisFault
+ faultCode: {http://schemas.xmlsoap.org/soap/envelope/}Server.generalException
+ faultSubcode: 
+ faultString: Failed in GetTAddressImpl(); nested exception is: 
+	failedSend; nested exception is: 
+	org.apache.axis.transport.jms.InvokeException: Error: unexpected message type received - expected BytesMessage
+ faultActor: 
+ faultNode: 
+ faultDetail: 
+	{http://xml.apache.org/axis/}hostname:chn705087
+
+Failed in GetTAddressImpl(); nested exception is: 
+	failedSend; nested exception is: 
+	org.apache.axis.transport.jms.InvokeException: Error: unexpected message type received - expected BytesMessage
+	at sample.addressbook.rpcclient.ActiveMQAxisClient.getTAddress(ActiveMQAxisClient.java:78)
+	at sample.addressbook.rpcclient.ActiveMQAxisClient.main(ActiveMQAxisClient.java:42)
+Caused by: failedSend; nested exception is: 
+	org.apache.axis.transport.jms.InvokeException: Error: unexpected message type received - expected BytesMessage
+	at org.apache.axis.transport.jms.JMSSender.invoke(JMSSender.java:107)
+	at org.apache.axis.strategies.InvocationStrategy.visit(InvocationStrategy.java:32)
+	at org.apache.axis.SimpleChain.doVisiting(SimpleChain.java:118)
+	at org.apache.axis.SimpleChain.invoke(SimpleChain.java:83)
+	at org.apache.axis.client.AxisClient.invoke(AxisClient.java:165)
+	at org.apache.axis.client.Call.invokeEngine(Call.java:2784)
+	at org.apache.axis.client.Call.invoke(Call.java:2767)
+	at org.apache.axis.client.Call.invoke(Call.java:2443)
+	at org.apache.axis.client.Call.invoke(Call.java:2366)
+	at org.apache.axis.client.Call.invoke(Call.java:1812)
+	at sample.addressbook.rpcclient.ActiveMQAxisClient.getTAddress(ActiveMQAxisClient.java:71)
+	... 1 more
+Caused by: org.apache.axis.transport.jms.InvokeException: Error: unexpected message type received - expected BytesMessage
+	at org.apache.axis.transport.jms.JMSConnector$SyncConnection$SendSession.call(JMSConnector.java:693)
+	at org.apache.axis.transport.jms.JMSConnector$SyncConnection.call(JMSConnector.java:485)
+	at org.apache.axis.transport.jms.JMSEndpoint.call(JMSEndpoint.java:71)
+	at org.apache.axis.transport.jms.JMSSender.invoke(JMSSender.java:96)
+	... 11 more
+
+Can anybody suggest me a solution for this. Is this a bug in ActiveMQ. i believe ActiveMQ is returning ActiveMQTextMessage, and the reciever is expecting ByteMessage. is there any solution available for this.
+
+I have attached the Client program ActiveMQAxisClient.java and all other files used to deploy the webservice.
+
+Thanks in advance,
+
+Regards,
+Reji
+",Bug,02/Sep/08 13:49
+AMQ-1915,12482577,,"Creating an {{ActiveMQConnectionFactory}}, and then calling {{setExclusiveConsumer(true)}}, does *not* cause queues created from that factory's connections to have the exclusive consumer feature. I'm pretty sure this is due to {{configureConnection()}} not calling {{setExclusiveConsumer()}} on new connections. This can be seen in the source code for {{ActiveMQConnectionFactory.configureConnection}}, release 5.1.",Bug,27/Aug/08 23:32
+AMQ-1816,12482122,,"The name of the database field ACTIVEMQ_LOCK.TIME is inconsistent in org.apache.activemq.store.jdbc.Statements: in getCreateSchemaStatements() its name is ""TIME"" (upper case) while in getLockUpdateStatement() it's called ""time"" (lower case). This causes problems with databases using a case-sensitive collation.
+
+I suggest using the uppercase variant, since this is more consistent with the naming of the other fields.",Bug,20/Jun/08 14:22
+AMQ-1770,12482466,,"You have to set the ""copyMessageOnSend"" option to false in order to get the upload to work for an ActiveMQBlobMessage.
+
+From a user forum thread
+
+""When the message is created with activeMQSession.createBlobMessage(File), it sets the message's blobUploader field. When the ActiveMQBlobMessage.copy() method is called, it does not copy this field. The new message has a null blobUploader. Then, when the ActiveMQBlobMessage.onSend() gets called, it does not upload the file if the blobUploader field is null.""
+
+I am assuming this to be a bug and not by design. ",Bug,05/Jun/08 04:12
+AMQ-1756,12482512,,"In the org.apache.activemq.ra.ManagedSessionProxy class the setMessageListener method doesn't do anything;.
+
+This prevents the MessageListener from being added to the Session and that makes it kind of hard to listen to messages.
+
+It seems quite probable that this is just a quick debugging fix that accidentally made it into subversion; but if there is some reason for this that I can't see please let me know.
+
+The code:
+    public void setMessageListener(MessageListener listener) throws JMSException {
+        getSession(); // .setMessageListener(listener);
+    }
+",Bug,29/May/08 17:34
+AMQ-1695,12482538,,"There is SNAPSHOT version of activeio-core in activemq-parent-5.0.0.pom.
+I have difficulties when using activemq-core 5.0 . Please,  change it to 3.1 version ASAP.
+
+ <dependency>
+        <groupId>org.apache.activemq</groupId>
+        <artifactId>activeio-core</artifactId>
+        <version>3.1-SNAPSHOT</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.activemq</groupId>
+        <artifactId>activeio-core</artifactId>
+        <version>3.1-SNAPSHOT</version>
+        <type>test-jar</type>
+</dependency>",Bug,28/Apr/08 15:26
+AMQ-1674,12482198,,"After a number of messages are delivered, the following error is encountered, and the consumer stops consuming (with variable IDs) :
+14:37:02,825 ERROR [RecoveryListenerAdapter] Message id ID:servername-01-48018-1201289318807-2:430:1:1:1 could not be recovered from the data store!
+
+This can be reproduced by building the jar via ant from the included tar.gz with exploded rar and jms data source. In order to produce, deploy rar,jar, and data source, and post some large number (>100000 works for me reliably) as a text message to PostingQueue. and it will post that many object messages to the ReportLogMDBQueue, which will eventually produce the error.",Bug,18/Apr/08 17:45
+AMQ-1584,12482279,12481996,"When deserializing a message contents the ClassLoadingAwareObjectInputStream loads any missing classes. However, it cannot load the classes that correspond with the primitive types, i.e. when a class named ""int"" is to be loaded it does not return int.class but instead throws a ClassNotFoundException.
+
+A patch is attached. The princple has been copied from ObjectInputStream.",Bug,15/Feb/08 09:51
+AMQ-1565,12482291,,"The error message I get is this:
+
+java.io.IOException: Could load xbean factory:java.lang.NoClassDefFoundError: org/springframework/core/io/FileSystemResource
+        at org.apache.activemq.util.IOExceptionSupport.create(IOExceptionSupport.java:27)
+
+presuambly the error should be that the class could *not* load the xbean factory :-)",Bug,23/Jan/08 14:41
+AMQ-1535,12482267,,"The bug mentioned in this post:
+http://www.nabble.com/wrapper.conf-5.0-SNAPSHOT-td13154884s2354.html#a13154884
+
+was not fixed in the 5.0.0 release.
+
+Please add the two lines to wrapper.conf mentioned in the post:
+wrapper.app.parameter.2=start 
+wrapper.app.parameter.3=xbean:activemq.xml 
+
+Without these lines, the broker does not work as a Windows Service.
+
+Thanks!",Bug,03/Jan/08 22:34
+AMQ-1508,12482649,,"When you add a destinationDotFilePlugin to the activemq configuration, like this:
+
+  <broker>
+	<plugins>
+	   <destinationDotFilePlugin/>
+	</plugins>
+       ...
+  </broker>
+
+The Broker refuses to start up and crashes with ArrayStoreException:
+
+ERROR BrokerService                  - Failed to start ActiveMQ JMS Message Broker. Reason: java.lang.ArrayStoreExceptio
+n
+java.lang.ArrayStoreException
+        at java.lang.System.arraycopy(Native Method)
+        at java.util.ArrayList.toArray(ArrayList.java:304)
+        at org.apache.activemq.broker.region.RegionBroker.getDestinations(RegionBroker.java:315)
+        at org.apache.activemq.broker.BrokerFilter.getDestinations(BrokerFilter.java:149)
+        at org.apache.activemq.broker.BrokerFilter.getDestinations(BrokerFilter.java:149)
+        at org.apache.activemq.broker.BrokerFilter.getDestinations(BrokerFilter.java:149)
+        at org.apache.activemq.broker.BrokerFilter.getDestinations(BrokerFilter.java:149)
+        at org.apache.activemq.broker.view.DestinationDotFileInterceptor.generateFile(DestinationDotFileInterceptor.java:53)
+        at org.apache.activemq.broker.view.DotFileInterceptorSupport.generateFile(DotFileInterceptorSupport.java:48)
+        at org.apache.activemq.broker.view.DestinationDotFileInterceptor.addDestination(DestinationDotFileInterceptor.java:43)
+        at org.apache.activemq.broker.MutableBrokerFilter.addDestination(MutableBrokerFilter.java:151)
+        at org.apache.activemq.broker.BrokerService.startDestinations(BrokerService.java:1619)
+        at org.apache.activemq.broker.BrokerService.start(BrokerService.java:410)
+        at org.apache.activemq.xbean.XBeanBrokerService.afterPropertiesSet(XBeanBrokerService.java:46)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.invokeInitMethods(AbstractAutowireCapableBeanFactory.java:1201)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.initializeBean(AbstractAutowireCapableBeanFactory.java:1171)
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:425)
+        at org.springframework.beans.factory.support.AbstractBeanFactory$1.getObject(AbstractBeanFactory.java:251)
+        at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:156)
+        at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:248)
+        at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:160)
+        at org.springframework.beans.factory.support.DefaultListableBeanFactory.preInstantiateSingletons(DefaultListableBeanFactory.java:287)
+
+The bug is in RegionBroker.getDestinations method:
+
+    public ActiveMQDestination[] getDestinations() throws Exception {
+		ArrayList l;
+
+		l = new ArrayList(destinations.values());
+
+		ActiveMQDestination rc[] = new ActiveMQDestination[l.size()];
+		l.toArray(rc);
+		return rc;
+	}
+
+The destinations property is Map where the keys are ActiveMQDestinations and the values are Destinations. Trying to convert a collection of Destinations to an array of ActiveMQConnections throws the aforementioned exception.
+
+The method should be changed to:
+
+    public ActiveMQDestination[] getDestinations() throws Exception {
+		ArrayList l;
+
+		l = new ArrayList(destinations.keySet());
+
+		ActiveMQDestination rc[] = new ActiveMQDestination[l.size()];
+		l.toArray(rc);
+		return rc;
+	}
+
+",Bug,29/Nov/07 15:42
+AMQ-1316,12482188,,"There are no getter/setter in apache-activemq-4.1.1/src/activemq-ra/src/main/java/org/apache/activemq/ra/ActiveMQManagedConnectionFactory.java for the ServerURL
+ 
+   public String getServerUrl() {
+        return info.getServerUrl();
+    }
+
+  public void setServerUrl(String url) {
+        info.setServerUrl(url);
+    }
+
+",Bug,06/Jul/07 09:02
+AMQ-1287,12481962,,"The STOMP connector is throwing away messages when the STOMP client disconnects.
+
+Here is the test scenario I am using.
+
+1) a publisher that writes 50 messages, 1 per second
+2) a subscriber that reads 10 messages, 1 per every 2 seconds
+2a) subscriber correctly sends stomp disconnect when done
+3) rerun subscriber each time it finishes with 10 messages.
+
+So during the first run of the subscriber, it gets 10 messages as expected.
+
+-bash-2.05b$ ./activemq_tester -p 61613 -d sub -s 2 -m 10
+Connecting......OK
+Sending connect message.OK
+Reading Response.Response: CONNECTED, 
+OK
+Sending Subscribe.OK
+Reading Subscribed Messsages.
+Received: MESSAGE, This is message number 0, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:1
+Received: MESSAGE, This is message number 1, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:2
+Received: MESSAGE, This is message number 2, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:3
+Received: MESSAGE, This is message number 3, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:4
+Received: MESSAGE, This is message number 4, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:5
+Received: MESSAGE, This is message number 5, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:6
+Received: MESSAGE, This is message number 6, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:7
+Received: MESSAGE, This is message number 7, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:8
+Received: MESSAGE, This is message number 8, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:9
+Received: MESSAGE, This is message number 9, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:10
+OK
+Sending Disconnect.OK
+Disconnecting...OK
+
+
+During this time since the publisher is about twice as fast, it has made it to message 22 and is still putting in one per second going to its prescribed 50 input messages.
+
+Now I uparrow and run the subscriber again.....
+
+-bash-2.05b$ ./activemq_tester -p 61613 -d sub -s 2 -m 10
+Connecting......OK
+Sending connect message.OK
+Reading Response.Response: CONNECTED, 
+OK
+Sending Subscribe.OK
+Reading Subscribed Messsages.
+Received: MESSAGE, This is message number 23, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:24
+Received: MESSAGE, This is message number 24, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:25
+Received: MESSAGE, This is message number 25, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:26
+Received: MESSAGE, This is message number 26, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:27
+Received: MESSAGE, This is message number 27, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:28
+Received: MESSAGE, This is message number 28, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:29
+Received: MESSAGE, This is message number 29, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:30
+Received: MESSAGE, This is message number 30, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:31
+Received: MESSAGE, This is message number 31, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:32
+Received: MESSAGE, This is message number 32, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:33
+OK
+Sending Disconnect.OK
+Disconnecting...OK
+
+
+And as you can see, messages 11..22 did not get read.
+
+and run the client once more since publisher is not done yet.
+
+-bash-2.05b$ ./activemq_tester -p 61613 -d sub -s 2 -m 10
+Connecting......OK
+Sending connect message.OK
+Reading Response.Response: CONNECTED, 
+OK
+Sending Subscribe.OK
+Reading Subscribed Messsages.
+Received: MESSAGE, This is message number 46, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:47
+Received: MESSAGE, This is message number 47, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:48
+Received: MESSAGE, This is message number 48, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:49
+Received: MESSAGE, This is message number 49, persistence flag [true]
+        message-id ID:lxdm14608.etrade.com-40939-1182371192387-3:0:-1:1:50
+
+
+again missing messages 34..46.
+
+
+But if I check the stats on this Queue, you can see that the broker has delivered all 50 messages.
+
+
+-bash-2.05b$ bin/activemq query -QQueue=*
+ACTIVEMQ_HOME: /home/jschaube/activemq/apache-activemq-4.1-SNAPSHOT
+ACTIVEMQ_BASE: /home/jschaube/activemq/apache-activemq-4.1-SNAPSHOT
+Type = Queue
+DispatchCount = 50
+Destination = TEST.FOO
+QueueSize = 0
+Name = TEST.FOO
+DequeueCount = 50
+MemoryPercentageUsed = 0
+ConsumerCount = 1
+MemoryLimit = 9223372036854775807
+EnqueueCount = 50
+BrokerName = b60000
+
+
+
+So what I suspect is that the STOMP connector had prefetched as many as were written, but then when the client sends STOMP ""DISCONNECT"" command, the connector does not put those messages back but rather just throws them away.
+
+This is not good especially when the messages are flagged persistent and I expect to loose none.
+
+STOMP client is c code, here is the disconnect and tear down of the socket....
+   fprintf(stdout, ""Sending Disconnect."");
+   {
+      stomp_frame frame;
+      frame.command = ""DISCONNECT"";
+      frame.headers = NULL;
+      frame.body = NULL;
+      rc = stomp_write(connection, &frame);
+      rc==APR_SUCCESS || die(-2, ""Could not send frame"", rc);
+   }  
+   fprintf(stdout, ""OK\n"");
+
+   fprintf(stdout, ""Disconnecting..."");
+        rc=stomp_disconnect(&connection); 
+        rc==APR_SUCCESS || die(-2, ""Could not disconnect"", rc);
+   fprintf(stdout, ""OK\n"");
+
+
+
+Here is part of the config, Notice I attempted to set the prefetch values to ""1"" to resolve the problem.
+But I am unsure of the syntax since it made no difference in the way it behaved.
+
+    <transportConnectors>
+       <transportConnector name=""openwire"" uri=""tcp://localhost:61616?jms.prefetchPolicy.queu
+ePrefetch=1"" discoveryUri=""multicast://default""/>
+       <transportConnector name=""ssl""     uri=""ssl://localhost:61617""/>
+       <transportConnector name=""stomp""   uri=""stomp://localhost:61613?jms.prefetchPolicy.que
+uePrefetch=1""/>
+    </transportConnectors>
+
+Joel Schaubert
+
+
+",Bug,20/Jun/07 20:39
+AMQ-1278,12482004,,"When we attempt to create a temporary queue, the connection hangs:
+
+""http-8080-Processor1"" daemon prio=10 tid=0x00127650 nid=0xd in Object.wait() [0x340fe000..0x340ffc28]
+        at java.lang.Object.wait(Native Method)
+        at java.lang.Object.wait(Unknown Source)
+        at edu.emory.mathcs.backport.java.util.concurrent.FutureTask.waitFor(FutureTask.java:267)
+        at edu.emory.mathcs.backport.java.util.concurrent.FutureTask.get(FutureTask.java:117)
+        - locked <0x4cfc65c0> (a org.apache.activemq.transport.FutureResponse)
+        at org.apache.activemq.transport.FutureResponse.getResult(FutureResponse.java:44)
+        - locked <0x4cfc65c0> (a org.apache.activemq.transport.FutureResponse)
+        at org.apache.activemq.transport.ResponseCorrelator.request(ResponseCorrelator.java:69)
+        at org.apache.activemq.ActiveMQConnection.syncSendPacket(ActiveMQConnection.java:1108)
+        at org.apache.activemq.ActiveMQConnection.createTempDestination(ActiveMQConnection.java:1453)
+        at org.apache.activemq.ActiveMQSession.createTemporaryQueue(ActiveMQSession.java:1103)
+        at es.tid.geremias.planb.QueryTask.getTask(QueryTask.java:198)
+        at es.tid.geremias.planb.QueryTask.doGet(QueryTask.java:157)
+        at javax.servlet.http.HttpServlet.service(HttpServlet.java:689)
+        at javax.servlet.http.HttpServlet.service(HttpServlet.java:802)
+        at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:237)
+        at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:157)
+        at org.apache.catalina.core.StandardWrapperValve.invoke(StandardWrapperValve.java:214)
+        at org.apache.catalina.core.StandardValveContext.invokeNext(StandardValveContext.java:104)
+        at org.apache.catalina.core.StandardPipeline.invoke(StandardPipeline.java:520)
+        at org.apache.catalina.core.StandardContextValve.invokeInternal(StandardContextValve.java:198)
+        at org.apache.catalina.core.StandardContextValve.invoke(StandardContextValve.java:152)
+        at org.apache.catalina.core.StandardValveContext.invokeNext(StandardValveContext.java:104)
+        at org.apache.catalina.authenticator.AuthenticatorBase.invoke(AuthenticatorBase.java:540)
+        at org.apache.catalina.core.StandardValveContext.invokeNext(StandardValveContext.java:102)
+        at org.apache.catalina.core.StandardPipeline.invoke(StandardPipeline.java:520)
+        at org.apache.catalina.core.StandardHostValve.invoke(StandardHostValve.java:137)
+        at org.apache.catalina.core.StandardValveContext.invokeNext(StandardValveContext.java:104)
+        at org.apache.catalina.valves.ErrorReportValve.invoke(ErrorReportValve.java:118)
+        at org.apache.catalina.core.StandardValveContext.invokeNext(StandardValveContext.java:102)
+        at org.apache.catalina.core.StandardPipeline.invoke(StandardPipeline.java:520)
+        at org.apache.catalina.core.StandardEngineValve.invoke(StandardEngineValve.java:109)
+        at org.apache.catalina.core.StandardValveContext.invokeNext(StandardValveContext.java:104)
+        at org.apache.catalina.core.StandardPipeline.invoke(StandardPipeline.java:520)
+        at org.apache.catalina.core.ContainerBase.invoke(ContainerBase.java:929)
+        at org.apache.coyote.tomcat5.CoyoteAdapter.service(CoyoteAdapter.java:160)
+        at org.apache.coyote.http11.Http11Processor.process(Http11Processor.java:799)
+        at org.apache.coyote.http11.Http11Protocol$Http11ConnectionHandler.processConnection(Http11Protocol.java:705)
+        at org.apache.tomcat.util.net.TcpWorkerThread.runIt(PoolTcpEndpoint.java:577)
+        at org.apache.tomcat.util.threads.ThreadPool$ControlRunnable.run(ThreadPool.java:683)
+        at java.lang.Thread.run(Unknown Source)",Bug,14/Jun/07 13:38
+AMQ-1274,12481731,,"If Active MQ is installed in a directory that contains spaces (i.e. E:\Program Files\apache-activemq-4.2-SNAPSHOT) the win32 service wrapper installer does not work.
+
+Just need to add quotes around path variables in bin\win32\wrapper.conf",Bug,12/Jun/07 20:58
+AMQ-1229,12482519,12485942,"org.apache.activemq.util.FactoryFinder.doFindFactoryProperies() correctly consults the current class's loader if Thread.currentThread().getContextClassLoader() is null:
+
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        if (classLoader == null) classLoader = getClass().getClassLoader();
+
+newInstance(), however, generates a null pointer exception if Thread.currentThread().getContextClassLoader() is null:
+
+        Class clazz;
+        try {
+            clazz = Thread.currentThread().getContextClassLoader().loadClass(className);
+        } catch (ClassNotFoundException e) {
+            clazz = FactoryFinder.class.getClassLoader().loadClass(className);
+        }",Bug,16/Apr/07 18:02
+AMQ-1146,12482091,,"Sometimes (when the transport is idle for long) the transport gets disconnected with the message ""Channel was inactive for too long."" 
+
+        Apparently this is same as reported in http://www.nabble.com/Channel-was-inactive-for-too-long-t1463069.html#a3971744 and http://www.nabble.com/Durable-consumer-reconnect-problem-tf1716817.html#a6147014 
+
+Version: 4.1 
+
+Background: 
+
+        The class org.apache.activemq.transport.InactivityMonitor runs monitoring threads to check the read and write of the transport(TCP for example). If it hasn't sent the message during the given period, it sends a KeepAliveInfo to ensure the connectivity. If it doesn't receive the message for a given duration, then it disconnects the transport. 
+
+        By default, the maximumInactivityDuration is 30000 milliseconds. This is the time interval between the check for read. That is if an end of the transport doesn't receive any message for this period, then it will close the connection. For the read check, the time interval is half of maximumInactivityDuration i.e. 15000 millisecond. That is if a message was not sent during this period, it will send a KeepAliveInfo to ensure the connectivity. 
+
+
+Problem and the recommended fix: 
+
+        The InactivityMonitor class uses the flags inReceive and commandReceived variables in methods readCheck and onCommand. Typically these two methods are called from different threads. Also, the flags inSend and commandSent are used in methods oneway and writeCheck. Again these two methods are called from different threads. But, the synchronization was missing for these. This seems to be a potential cause for the problem. So, synchronization has been incorporated for these flag usages. 
+
+        The same class InactivityMonitor is used at both client and server side. In general, the write check (which sends KeepAliveInfo) happens twice during the time when the read check happens once. Probably the client and server machines have performance differences and just to be safer, now the write check is made to happen thrice during the time when the read check happens once. 
+
+
+        The original and the changed source files are attached here. 
+
+http://www.nabble.com/file/5958/InactivityMonitor_changed.java
+
+http://www.nabble.com/file/5957/InactivityMonitor_Original.java
+",Bug,01/Feb/07 20:26
+AMQ-1057,12481847,,"
+    consumer queue is empty when running requester, producer and consumer. The reply destination also results into an empty string.  ",Bug,17/Nov/06 01:56
+AMQ-1048,12481881,,"Some command line not works properly, just return de prompt 
+Example: 
+query -QQueue=* 
+
+query --objname Type=Connect,BrokerName=localhost -xQNetworkConnector=* 
+
+etc...",Bug,14/Nov/06 20:53
+AMQ-945,12481719,,"In project.xml of active-core : you find activemq-jaas twice
+One with a propertie rar.bundle = true
+One without taht propertie
+
+And in actuvemq-jaas/project.xml You find two jdbm
+
+",Bug,27/Sep/06 20:30
+AMQ-944,12481954,,"It seems that one can nto use multicast in a transportConnector.
+
+Description of the test:
+In the distribution, go into /example
+Edit the build.xml in order to use multicast. for instance
+Change the URL in the build.xml to :
+<property name=""url"" value=""multicast://225.0.0.1:61620"" />
+Start the producer: ant producer
+
+Here is the output:
+    [echo] Running producer against server at $url = multicast://225.0.0.1:61620 for subject $subject = Syntheses
+    [java] Connecting to URL: multicast://225.0.0.1:61620
+    [java] Publishing a Message with size 1000 to queue: Syntheses
+    [java] Using non-durable publishing
+    [java] Sleeping between publish 0 ms
+    [java] DEBUG MulticastTransport             - Joining multicast address: /225.0.0.1
+    [java] DEBUG UdpTransport                   - Consumer thread starting for: multicast://225.0.0.1:61620@0
+    [java] DEBUG UdpTransport                   - Sending oneway from: multicast://225.0.0.1:61620@0 to target: /225.0.
+0.1:61620 command: ConnectionInfo {commandId = 1, responseRequired = true, connectionId = ID:ZOZMA-2042-1159347487015-0:
+0, clientId = ID:ZOZMA-2042-1159347487015-1:0, userName = null, password = null, brokerPath = null, brokerMasterConnecto
+r = false, manageable = true}
+    [java] DEBUG DefaultReplayBuffer            - Adding command ID: 1 to replay buffer: org.apache.activemq.transport.
+reliable.DefaultReplayBuffer@1b3f829 object: [B@698403
+    [java] DEBUG CommandDatagramSocket          - Channel: multicast://225.0.0.1:61620@0 sending datagram: 1 to: /225.0
+.0.1:61620
+    [java] DEBUG CommandDatagramSocket          - Channel: multicast://225.0.0.1:61620@0 about to process: ConnectionIn
+fo {commandId = 1, responseRequired = true, connectionId = ID:ZOZMA-2042-1159347487015-0:0, clientId = ID:ZOZMA-2042-115
+9347487015-1:0, userName = null, password = null, brokerPath = null, brokerMasterConnector = false, manageable = true}
+    [java] DEBUG ReliableTransport              - Still waiting for response on: multicast://225.0.0.1:61620@0 to comma
+nd: ConnectionInfo {commandId = 1, responseRequired = true, connectionId = ID:ZOZMA-2042-1159347487015-0:0, clientId = I
+D:ZOZMA-2042-1159347487015-1:0, userName = null, password = null, brokerPath = null, brokerMasterConnector = false, mana
+geable = true} sending replay message
+    [java] DEBUG UdpTransport                   - Sending oneway from: multicast://225.0.0.1:61620@0 to target: /192.9.
+211.39:61620 command: ReplayCommand {commandId = 2, firstNakNumber = 1, lastNakNumber = 1}
+    [java] DEBUG DefaultReplayBuffer            - Adding command ID: 2 to replay buffer: org.apache.activemq.transport.
+reliable.DefaultReplayBuffer@1b3f829 object: [B@d02b51
+    [java] DEBUG CommandDatagramSocket          - Channel: multicast://225.0.0.1:61620@0 sending datagram: 2 to: /192.9
+.211.39:61620
+    [java] DEBUG CommandDatagramSocket          - Channel: multicast://225.0.0.1:61620@0 about to process: ReplayComman
+d {commandId = 2, firstNakNumber = 1, lastNakNumber = 1}
+    [java] DEBUG ReliableTransport              - Processing replay command: ReplayCommand {commandId = 2, firstNakNumb
+er = 1, lastNakNumber = 1}
+    [java] DEBUG DefaultReplayBuffer            - Buffer: org.apache.activemq.transport.reliable.DefaultReplayBuffer@1b
+3f829 replaying messages from: 1 to: 1
+*     [java] DEBUG CommandDatagramSocket          - Channel: multicast://225.0.0.1:61620@0 REDELIVERING datagram: 1 to: /
+225.0.0.1:61620*
+",Bug,27/Sep/06 14:41
+AMQ-885,12481929,,"When creating ActiveMQConnectionFactory instance, one shall set UseAsyncSend attribute to false,
+otherwise performance are very poor if the server and the client are not running on the same machine.
+
+The question is : Is it normal to have to set UseAsyncSend to false if we want to have good performance ?
+
+	ActiveMQConnectionFactory factory = new ActiveMQConnectionFactory(brokerURL);
+    	factory.setUseAsyncSend(false);
+
+Thanks
+
+
+",Bug,20/Aug/06 12:41
+AMQ-852,12482238,,"When you run ""my test program"" and end this process  with Ctrl+C/ kill/ kill -9 ( i mostly used Ctrl+C) sometimes during let say 100 iteration ""communication between client and broker is damaged"". This results in situation when after restart ( new pid ) client program is unable to create producer.  call to   consumer = rec_session->createConsumer( rec_queue );
+ hangs client program. Sometimes this results with exception as you can see in output of my program. I think that this only occurs when the session is in ClienAckMode. From my point of view is there incorrect handling of situation when client receives message from broker and than terminates connection without ack/nack this receive in certatin circumstances ...
+
+output:
+ ./amqtest tcp://lxstaflik:61616 PH_Q_IN_10 PH_Q_OUT_10
+Setting connection URL to 'tcp://lxstaflik:61616'
+Setting receive queue name to 'PH_Q_IN_10'
+Setting send queue name to 'PH_Q_OUT_10'
+Init ...
+Creating connection factory ...
+Connection factory created, creating connection ...
+Connection created, creating receive session...
+receive session created, creating sending session ...
+send session created, creating receive queue...'PH_Q_IN_10'
+receive queue created, creating consumer for this queue ...
+setting listener ...
+Error on connection Unmarshal failed; unknown data structure type 49, at src/main/cpp/activemq/protocol/openwire/OpenWireMarshaller.cpp line 711Exiting read loop due to exception: Unmarshal failed; unknown data structure type 49, at src/main/cpp/activemq/protocol/openwire/OpenWireMarshaller.cpp line 711
+
+
+Here is source code of my example:
+#include <stdio.h>
+#include <unistd.h>
+
+#include <exception>
+#include <iostream>
+#include <map>
+#include <string>
+
+#include ""cms/IConnection.hpp""
+#include ""cms/IConnectionFactory.hpp""
+#include ""activemq/ConnectionFactory.hpp""
+#include ""activemq/Connection.hpp""
+#include ""activemq/Session.hpp""
+#include ""ppr/TraceException.hpp""
+#include ""ppr/net/Uri.hpp""
+#include ""ppr/util/ifr/p""
+
+using namespace apache::activemq;
+using namespace apache::cms;
+using namespace apache::ppr;
+using namespace apache::ppr::net;
+using namespace ifr;
+using namespace std;
+
+
+class ActiveMQTest : public IExceptionListener, public IMessageListener {
+  private:
+        p<Uri>                  uri;
+        p<IConnectionFactory>   factory;
+        p<IConnection>          connection;
+        p<ISession>             rec_session;
+        p<ISession>             snd_session;
+        p<IQueue>               rec_queue;
+        p<IQueue>               snd_queue;
+        p<IMessageProducer>     producer;
+        p<IMessageConsumer>     consumer;
+        p<ITextMessage>         txtmsg;
+        char szRecQueue[128];
+        char szSndQueue[128];
+  public:
+        ActiveMQTest();
+        virtual ~ActiveMQTest();
+        virtual void setUri(const char *);
+        virtual void init();
+        virtual void done();
+        virtual void onException(exception& error);
+        virtual void onMessage(p<IMessage> message);
+        virtual void ActiveMQTest::setSndQueue(const char *szQueue);
+        virtual void ActiveMQTest::setRecQueue(const char *szQueue);
+};
+
+void ActiveMQTest::onMessage( p<IMessage> message) {
+   p<ITextMessage>      snd_message;
+
+   this->txtmsg = p_dyncast<ITextMessage>(message);
+
+   p<string> string_request = txtmsg->getText();
+
+   if (string_request != NULL ) {
+     printf(""Received message : %s"",string_request->c_str());
+   }
+
+   sleep(10);
+
+   message->acknowledge();
+
+   snd_message = snd_session->createTextMessage() ;
+   snd_message->setText(""TEST\n"") ;
+   snd_message->setJMSPersistent(1);
+   // Send message
+   producer->send(message) ;
+}
+
+void ActiveMQTest::done() {
+   rec_session->close();
+   snd_session->close();
+}
+
+void ActiveMQTest::setUri(const char * uri) {
+    this->uri = new Uri(uri) ;
+}
+
+void ActiveMQTest::setSndQueue(const char *szQueue) {
+  strcpy(szSndQueue,szQueue);
+}
+
+void ActiveMQTest::setRecQueue(const char *szQueue) {
+  strcpy(szRecQueue,szQueue);
+}
+
+ActiveMQTest::ActiveMQTest() {
+  this->connection = NULL;
+  this->rec_session = NULL;
+  this->snd_session = NULL;
+  memset(szRecQueue,0x0,sizeof(szRecQueue));
+  memset(szSndQueue,0x0,sizeof(szSndQueue));
+}
+
+ActiveMQTest::~ActiveMQTest() {
+}
+
+void ActiveMQTest::init() {
+  try {
+    cout.rdbuf(cerr.rdbuf());
+    printf(""1 Creating connection factory ... \n"");
+    factory = new ConnectionFactory( uri );
+
+    printf(""Connection factory created, creating connection ...\n"");
+    connection = factory->createConnection();
+
+    printf(""Connection created, creating receive session...\n"");
+    p_cast<Connection>(connection)->setExceptionListener( smartify( this ) );
+    //rec_session = connection->createSession(AutoAckMode);
+    rec_session = connection->createSession(ClientAckMode);
+
+    printf(""receive session created, creating sending session ...\n"");
+    snd_session = connection->createSession(AutoAckMode);
+
+    printf(""send session created, creating receive queue...'%s'\n"",szRecQueue);
+    rec_queue = rec_session->getQueue( szRecQueue );
+
+
+    printf(""receive queue created, creating consumer for this queue ...\n"");
+    consumer = rec_session->createConsumer( rec_queue );
+
+
+    printf(""setting listener ...\n"");
+    snd_queue = snd_session->getQueue( szSndQueue );
+    consumer->setMessageListener( smartify( this ) );
+    producer = snd_session->createProducer( snd_queue );
+
+    (p_dyncast<apache::activemq::Session>(rec_session))->dispatch(0);
+
+    printf(""Init Ok.\n"");
+
+  } catch ( TraceException& e ) {
+    printf(""Error during init  ... \n"");
+  }
+}
+
+void ActiveMQTest::onException( exception& error ) {
+  printf(""Error on connection %s"", error.what() );
+}
+
+
+int main(int argc,char *argv[]) {
+  ActiveMQTest* myAq;
+
+
+  if ( argc < 3 ) {
+    printf(""Usage: amqtest <connection_url> <receive_queue> <send_queue>\n"");
+    exit(0);
+  }
+
+  myAq = new ActiveMQTest;
+
+  printf(""Setting connection URL to '%s'\n"",argv[1]);
+  myAq->setUri(argv[1]);
+
+  printf(""Setting receive queue name to '%s'\n"",argv[2]);
+  myAq->setRecQueue( argv[2] );
+
+  printf(""Setting send queue name to '%s'\n"",argv[3]);
+  myAq->setSndQueue( argv[3] );
+
+  printf(""Init ...\n"");
+  myAq->init();
+
+
+int i=0;
+  while( i < 3000 ) {
+    printf(""Idle ... \n"");
+    sleep( 1 );
+    i++;
+  }
+
+  myAq->done();
+
+  return 0;
+}
+
+
+",Bug,31/Jul/06 14:17
+AMQ-849,12481796,,"Noticed that when using copyOnSend feature and compression, sent messages were not being compressed. It was then found that this was due to the fact that the connection that is used to determine whether compression should be performed or not, was null for the copied message. A look into the Message found that the connection and a number of other properties of the Message were not copied in the copy(Message) 
+
+The patch attached copies the remaining properties of the Message to the message copy.",Bug,28/Jul/06 06:53
+AMQ-739,12481674,,"Sending a text message from a stomp client with a content-length results in a bytes message on JMS.  Suggest doing the following ...
+
+1) The stomp transport should always add the content-length header to out-going messages, regardless of content-type or whether or not a content-length was provided on the incoming message.
+2) The stomp transport should handle in-coming messages with a content-type header, and should pass that through.
+3) If a message comes in without a content-length or a content-type, it should just be assumed a TextMessage.  This way we can use the terminating null character as the delimiter.",Bug,08/Jun/06 00:23
+AMQ-714,12481737,,"When you define a policy Entry using a wildcard (eg. FOO.>) in the xml configuration it is not applied as expected.
+
+Specifically I was attempting to use a lastImageSubscriptionRecoveryPolicy on all subtopics of FOO.>
+
+If I publish three messages to each of FOO.a, FOO.b and FOO.c and then setup a consumer (retroactive = true) to each of the topics FOO.a, FOO.b and FOO.c I receive three copies of the last message sent to any of the topics  In this case the third message sent to FOO.c.
+
+Expected behaviour would be to receive the last message from each topic that is message three from FOO.a, FOO.b and FOO.c
+
+More troubling is if I setup a new session with a consumer only to FOO.a and FOO.b I receive two copied of the third message sent to FOO.c.  Even though this session is not subscribed to FOO.c, presumably this is because the policy is only keeping the last message that matches the destination and returning it as the last image, regardless of if the topic matches the subscription.
+
+With explicit policy entries for each topic (FOO.a, FOO.b) the broker returns the correct messages, so I believe the problem is with wildcard handling.  I need wildcard support here because I do not know my topic names upfront.  I would think that this would be a common scenario (like setting a last image recovery policy on all stock quotes Stock.> )",Bug,18/May/06 22:31
+AMQ-580,12481570,,"browse when given a nonexistent queue throws an exception rather than an error message:
+
+---> scott@jvlinux (0.08)$ ./browse --amqurl tcp://localhost:61616 notification.annuncio
+ACTIVEMQ_HOME: /opt/apps/activemq
+WARN  ActiveMQConnection             - Cleanup failed
+org.apache.activemq.ConnectionClosedException: The connection is already closed
+        at org.apache.activemq.ActiveMQConnection.asyncSendPacket(ActiveMQConnection.java:1030)
+        at org.apache.activemq.ActiveMQConnection.cleanup(ActiveMQConnection.java:1191)
+        at org.apache.activemq.ActiveMQConnection.transportFailed(ActiveMQConnection.java:1585)
+        at org.apache.activemq.ActiveMQConnection.onException(ActiveMQConnection.java:1338)
+        at org.apache.activemq.transport.TransportFilter.onException(TransportFilter.java:102)
+        at org.apache.activemq.transport.TransportFilter.onException(TransportFilter.java:102)
+        at org.apache.activemq.transport.TransportFilter.onException(TransportFilter.java:102)
+        at org.apache.activemq.transport.TransportSupport.onException(TransportSupport.java:90)
+        at org.apache.activemq.transport.tcp.TcpTransport.run(TcpTransport.java:149)
+        at java.lang.Thread.run(Thread.java:595)
+
+I then push some messages onto notification.annuncio, then remove them all, and see
+
+---> scott@jvlinux (0.24)$ ./browse --amqurl tcp://localhost:61616 notification.annuncio
+ACTIVEMQ_HOME: /opt/apps/activemq
+
+",Bug,18/Feb/06 01:25
+AMQ-491,12481515,,"See output below.  Verified w/ debug on that URLs to fetch jar file are well-formed but content does not exist in the repository.  
+
++----------------------------------------
+| Executing default ActiveMQ :: Optional
+| Memory: 7M/9M
++----------------------------------------
+DEPRECATED: the default goal should be specified in the <build> section of project.xml instead of maven.xml
+DEPRECATED: the default goal should be specified in the <build> section of project.xml instead of maven.xml
+
+default:
+
+build:end:
+
+Attempting to download geronimo-kernel-1.0-SNAPSHOT.jar.
+Attempting to download geronimo-system-1.0-SNAPSHOT.jar.
+Attempting to download org.mortbay.jetty-5.1-SNAPSHOT.jar.
+WARNING: Failed to download org.mortbay.jetty-5.1-SNAPSHOT.jar.
+
+BUILD FAILED
+File...... /Users/dkords/.maven/cache/maven-multiproject-plugin-1.4.1/plugin.jelly
+Element... maven:reactor
+Line...... 218
+Column.... -1
+The build cannot continue because of the following unsatisfied dependency:
+
+org.mortbay.jetty-5.1-SNAPSHOT.jar
+
+Total time   : 42 seconds 
+Finished at  : Monday, January 16, 2006 10:06:42 PM PST ",Bug,17/Jan/06 06:21
+AMQ-464,12481484,,"For background: http://forums.logicblaze.com/posts/list/116.page
+
+I've created a test case which demonstrates the issue in the assembly module...
+
+TwoBrokerTopicSendReceiveLotsOfMessagesUsingTcpTest.java
+
+You might want to enable log4j logging to see the messages that are received",Bug,04/Jan/06 17:54
+AMQ-414,12481337,,"I raised a Geronimo issue last week -- http://issues.apache.org/jira/browse/GERONIMO-1155. I also posted a patch. I'll repost, here...
+
+While running a test of the DayTrader sample application, the server received an OutOfMemoryException. At the time of failure, there were over 150,000 ActiveMQSession objects. These sessions were being kept alive by ActiveMQ TransactionContexts associated with ActiveMQManagedConnections. I believe that Sessions are being registered with the ActiveMQManagedConnection TransactionContexts, but will never be unregistered via TransactionContext.removeSession(Session).
+
+In non-managed environments, the TransactionContext is owned by the Session. So, a Session does not need to be explicitly removed from the TransactionContext. Once a Session has been closed, both the Session and the TransactionContext are available for garbage collection. The Session never bothers to ""unregister"" with its associated TransactionContext. IMO, this is the root of the problem. There's a different TransactionContexts structure in RA environments.
+
+ManagedConnections have an additional TransactionContext. As Sessions are created, an RATransactionContext is generated for each new Session. As a Session registers with the RATransactionContext, the RATransactionContext locally registers the Session, but also registers the Session with the ManagedConnection's TransactionContext. It's this registration that is the problem... The Session will never be removed from the ManagedConnection's TransactionContext.
+
+DayTrader repeatedly drives an EJB to publish a message. The processing in the EJB is pretty simple, create a connection from a ConnectionFactory, create a session, create a producer, and send a message. .createConnection(), connection.createSession(), session.createProducer, connection.close(). The ManagedConnection is pooled. So, the connection (and its TransactionContext) are long-lived. Each iteration through the EJB is going to cause the creation of a new Session which is registered with the ManagedConnection's TransactionContext. However, the Session will never be removed from this TransactionContext...
+
+I could create the same basic problem by creating a Connection, and repeatedly creating a session and closing it. 
+
+The above is from my reading of the code. I'm not currently able to run DayTrader in my dev environment. Should be easy to create a simple test-case, but I haven't gotten around to it, yet. 
+
+The obvious fix is to add the following to ActiveMQSession.doClose():
+
+    this.transactionContext.removeSession(this);
+
+I'll post a patch. Let me know if I'm missing something obvious... ",Bug,17/Nov/05 03:21
+AMQ-408,12481555,,"*configure the broker to have one persistence that is a datasource which is pointing to mysql.
+*do not put in the journal persistence.
+*making a 500 connections and kill the client VM.
+*continue the above step and you will see activemq build up memory.",Bug,11/Nov/05 23:18
+AMQ-401,12481431,,"When I use derbydb and hsqldb to store data.I always send data and not recive data.
+Then will report memory limit,and then I close activeMq,and then run activeMQ,then will recover data.
+
+But,when activeMQ print Start recover data,it will stop.I have wait 2 hours and repleace other database.Always stop.
+",Bug,02/Nov/05 09:45
+AMQ-398,12481392,,Lack of synchronization in the org.activemq.io.util.FileDataBlock.activate and deactivate method. This causes an invalid handle IOException when a fast producer sends a large number of non-persistent messages to a slow consumer.,Bug,28/Oct/05 07:57
+AMQ-364,12481386,,"The PropertyPlaceholderConfigurer *requires* that all properties in the XML config are present in the System.properties object.
+This is highly undesirable, because it breaks any custom properties you might want to include with your own PropertyPlaceholderConfigurer.
+
+Fix for this is probably to change it to a PropertyOverrideConfigurer.
+
+Example of config exhibiting problem:
+http://rafb.net/paste/results/V7zpTo15.html",Bug,16/Sep/05 19:04
+AMQ-357,12481362,,"I have developped a little application. It's goal is to send and recieve message on a queue.
+I use an EJBStateful deploy on WebSphere.
+I have configure an QueueConnectionFactory on WAS Ressource Adapter.
+
+I have two services on the EJB :
+                       open (Queue) where 
+                                            I retrieve QueueConnectionFactory with JNDI Look up :
+
+InitialContext ictx = new InitialContext();
+qFactory =(QueueConnectionFactory) ictx.lookup(CONNECTION_JNDI_QUEUE);
+
+
+                                            I create Connection, Session, Destination and producer:
+
+	try {
+				staticQueueConnection = qFactory.createConnection();
+				staticQueueConnection.start();
+				staticQueueSession = staticQueueConnection.createSession(transacted, ackMode);
+				if (staticQueueSession!=null)
+				{
+					staticQueueDestination = staticQueueSession.createQueue(queueName);
+					log.info(""Created destination: "" + staticQueueDestination);
+				
+					staticQueueProducer = staticQueueSession.createProducer(staticQueueDestination);
+					log.info(""Created producer: "" + staticQueueProducer);
+					
+					
+				}
+			} catch (JMSException e1) {
+				
+				throw new NotificationException(e1.toString());
+			}
+
+                        publish(MEssage)  where 
+                                            I just send message on queue:
+
+messages = staticQueueSession.createTextMessage(notification.getText());
+staticQueueProducer.send(messages);
+
+
+
+
+I stock the producer on the session.
+
+So my application do :
+              Call open() so we can see on ActiveMQ log that a connection is created with a client but just after this exécution the client is removed!!!
+             So when applicatiion call publish() I have the message ""Connection is closed"" adn publish failed.
+
+I meet this problem only if I retrieve the QueueConnectionFactory on WebSphere if I create directly on classe the QueueConnectionFactory I don't met any probleme, every thing work:
+
+	aFactory = new ActiveMQConnectionFactory();
+	aFactory.setBrokerURL(URL_BROKER);
+  
+So If you have an idea it will be great...
+",Bug,14/Sep/05 16:49
+AMQ-166,12481114,,"TransportChannelSupport have concurrent problem. Sometimes activemq warnning this message. --> ""No Packet found to match Receipt correlationId"". TransportChannelSupport's member field ""sessionList"" does not thread safe. How about change the field type from java.util.HashMap to java.util.Hashtable. 
+
+And I have a question. 
+How to know the pending message count in Queue or Topic in jms client application. How to use JMS management function.",Bug,30/Dec/04 14:32

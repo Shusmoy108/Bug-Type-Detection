@@ -1,0 +1,91 @@
+Bug ID,Bug Description,BFC Hash,BFC Description
+AMQ-225,"Hi Ben,
+
+That's our db auto detection code not working right.  Seems like you  
+oracle driver is reporting Oracle_JDBC_driver as the type of driver.   
+But we were expecting to get Oracle_JDBC_Driver (case is different).
+Since auto detection is not working for you (I'll work on getting this  
+right for the next release), you should change the persistence config  
+so it looks like:
+
+ <persistence>
+       <cachePersistence>
+         <journalPersistence directory=""../var/journal/"">
+           <jdbcPersistence dataSourceRef=""oracle-ds""   adapterClass=""org.codehaus.activemq.store.jdbc.adapter.OracleJDBCAdapter""/>
+         </journalPersistence>
+       </cachePersistence>
+     </persistence>
+
+Regards,
+Hiram
+
+On Mar 16, 2005, at 10:40 AM, Ben.Temperton@... wrote:
+
+> Hi,
+>
+> I'm trying to set up active MQ to persist its message store in an  
+> oracle
+> database.
+> I've added the following to my activemq.xml file:
+>
+> <bean id=""oracle-ds"" class=""org.apache.commons.dbcp.BasicDataSource""
+> destroy-method=""close"">
+>     <property name=""driverClassName"">
+>       <value>oracle.jdbc.driver.OracleDriver</value>
+>     </property>
+>     <property name=""url"">
+>       <value>jdbc:oracle:thin: <at> myserver:1521:mydb</value>
+>     </property>
+>     <property name=""username"">
+>       <value>activemq</value>
+>     </property>
+>     <property name=""password"">
+>       <value>activemq</value>
+>     </property>
+>     <property name=""poolPreparedStatements"">
+>       <value>true</value>
+>     </property>
+>   </bean>
+>
+> and to my <broker> tag I have added the following:
+>
+> <persistence>
+>       <cachePersistence>
+>         <journalPersistence directory=""../var/journal/"">
+>           <jdbcPersistence dataSourceRef=""oracle-ds""/>
+>         </journalPersistence>
+>       </cachePersistence>
+>     </persistence>
+>
+>
+> When I start up activeMQ using ""activemq.bat"", ActiveMQ creates the  
+> tables
+> required in mydb. However, in full debug mode, it throws the following
+> warning:
+>
+> 15:34:28 WARN  Unrecognized database type (Oracle_JDBC_driver).  Will  
+> use
+> default JDBC implementation.
+> 15:34:28 DEBUG Reason: java.io.IOException: Could not find class for
+> resource: META-INF/services/org
+> /codehaus/activemq/store/jdbc/Oracle_JDBC_driver
+> java.io.IOException: Could not find class for resource:
+> META-INF/services/org/codehaus/activemq/store/jdbc/Oracle_JDBC_driver
+>         at
+> org.codehaus.activemq.util.FactoryFinder.doFindClass(FactoryFinder.java 
+> :76)
+",MDExOlB1bGxSZXF1ZXN0MjU4OTE5ODI2,"…ages is Zero after the recovery, the next shutdown will also be 'unclean'"
+AMQ-617,"The exceptions are always along these lines...
+16:20:30,864 INFO [STDOUT] java.lang.ClassCastException: org.apache.activemq.command.XATransactionId 
+16:20:30,865 INFO [STDOUT] at org.apache.activemq.openwire.v1.TransactionInfoMarshaller.unmarshal(TransactionInfoMarshaller.java:67) 
+16:20:30,865 INFO [STDOUT] at org.apache.activemq.openwire.OpenWireFormat.doUnmarshal(OpenWireFormat.java:214) 
+16:20:30,865 INFO [STDOUT] at org.apache.activemq.openwire.OpenWireFormat.unmarshal(OpenWireFormat.java:181) 
+16:20:30,865 INFO [STDOUT] at org.apache.activemq.transport.tcp.TcpTransport.run(TcpTransport.java:135) 
+16:20:30,865 INFO [STDOUT] at java.lang.Thread.run(Thread.java:595) 
+
+see the test case MarshallingWithCachingTest for how to reproduce the problem.
+",MDExOlB1bGxSZXF1ZXN0MjAxNTExNzI3,AMQ-7011 Override dispatch to always set dispatchAsync true.
+AMQ-3948,"We have a java web-service (running in Jetty) that dynamically instantiates an ActiveMQ queue and send messages to the queue - the messages are integers (i.e. 1, 2, 3, etc). We have from one to many consumers that read from this queue to process these messages. Each consumer is started from a single process but each consumer is running in it's own thread or process. When we have multiple consumers running, they occasionally will pick up the same integer or message from the queue. This is not desired. If a consumer reads a message, we don't want other consumers to retrieve that same message. We're fairly new to ActiveMQ but those we're telling about this issue said it should not be happening. They think it might be that we have an ActiveMQ configuration issue. Could be we need to set a property to prevent this. Just looking for some help. I've attached our applicationContext-mcp-parallelization-activemq XML. We could have configured this incorrectly. We're using the internalAmqConnectionFactory for this queue.",MDExOlB1bGxSZXF1ZXN0MzMzOTkyODg=,"For:
+
+https://issues.apache.org/jira/browse/AMQ-5713
+"
